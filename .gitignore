@@ -1,11 +1,13 @@
 # Dependencies
 node_modules/
 .npm/
+package-lock.json
 
 # Firebase
 .firebase/
 firebase-debug.log
 firestore-debug.log
+*-debug.log
 
 # IDE
 .vscode/
@@ -20,7 +22,13 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Environment
 .env
 .env.local
+.env.*.local
+
+# Local dev
+.cache/

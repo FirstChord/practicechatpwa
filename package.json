@@ -1,0 +1,31 @@
+{
+  "name": "practice-chat-pwa",
+  "version": "1.0.0",
+  "description": "Progressive Web App for capturing lesson conversations and practice reflections using Whisper API",
+  "scripts": {
+    "dev": "python3 -m http.server 8000 --directory public",
+    "deploy": "firebase deploy --only hosting",
+    "firebase:login": "firebase login",
+    "firebase:init": "firebase init"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FirstChord/practicechatpwa.git"
+  },
+  "keywords": [
+    "pwa",
+    "speech-to-text",
+    "whisper",
+    "music-lessons",
+    "lesson-notes"
+  ],
+  "author": "First Chord Music School",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/FirstChord/practicechatpwa/issues"
+  },
+  "homepage": "https://github.com/FirstChord/practicechatpwa#readme",
+  "devDependencies": {
+    "firebase-tools": "^15.1.0"
+  }
+}
