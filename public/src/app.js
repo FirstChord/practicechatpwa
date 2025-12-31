@@ -27,7 +27,6 @@ class PracticeChatApp {
         this.initializeElements();
         this.bindEvents();
         this.updateQuestionDisplay();
-        this.loadPreviousNotes();
     }
 
     initializeElements() {
@@ -36,23 +35,19 @@ class PracticeChatApp {
         this.questionTextEl = document.getElementById('questionText');
         this.questionProgressEl = document.getElementById('questionProgress');
 
-        // Recording buttons
-        this.recordBtn = document.getElementById('recordBtn');
-        this.stopBtn = document.getElementById('stopBtn');
+        // Main action button
+        this.mainActionBtn = document.getElementById('mainActionBtn');
+        this.mainActionText = document.getElementById('mainActionText');
 
         // Navigation buttons
         this.skipBtn = document.getElementById('skipBtn');
         this.backBtn = document.getElementById('backBtn');
-        this.nextBtn = document.getElementById('nextBtn');
-        this.finishBtn = document.getElementById('finishBtn');
 
         // Answer display
         this.currentAnswerEl = document.getElementById('currentAnswer');
-        this.editAnswerBtn = document.getElementById('editAnswerBtn');
 
         // Output elements
         this.copyBtn = document.getElementById('copyBtn');
-        this.clearBtn = document.getElementById('clearBtn');
         this.newBtn = document.getElementById('newBtn');
         this.statusEl = document.getElementById('status');
         this.processedEl = document.getElementById('processed');
@@ -60,19 +55,50 @@ class PracticeChatApp {
 
         // Question section
         this.questionSection = document.getElementById('questionSection');
+
+        // Button state
+        this.buttonState = 'start'; // start, stop, next, finish
     }
 
     bindEvents() {
-        this.recordBtn.addEventListener('click', () => this.startRecording());
-        this.stopBtn.addEventListener('click', () => this.stopRecording());
+        this.mainActionBtn.addEventListener('click', () => this.handleMainAction());
         this.skipBtn.addEventListener('click', () => this.skipQuestion());
         this.backBtn.addEventListener('click', () => this.previousQuestion());
-        this.nextBtn.addEventListener('click', () => this.nextQuestion());
-        this.finishBtn.addEventListener('click', () => this.finishRecording());
-        this.editAnswerBtn.addEventListener('click', () => this.editAnswer());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
-        this.clearBtn.addEventListener('click', () => this.clearNotes());
         this.newBtn.addEventListener('click', () => this.resetForNew());
+    }
+
+    handleMainAction() {
+        switch (this.buttonState) {
+            case 'start':
+                this.startRecording();
+                break;
+            case 'stop':
+                this.stopRecording();
+                break;
+            case 'next':
+                this.nextQuestion();
+                break;
+            case 'finish':
+                this.finishRecording();
+                break;
+        }
+    }
+
+    updateMainButton(state, text, icon) {
+        this.buttonState = state;
+        this.mainActionText.textContent = text;
+        this.mainActionBtn.querySelector('.btn-icon').textContent = icon;
+
+        // Update button color based on state
+        this.mainActionBtn.className = 'btn btn-large';
+        if (state === 'start' || state === 'stop') {
+            this.mainActionBtn.classList.add('btn-primary');
+        } else if (state === 'next') {
+            this.mainActionBtn.classList.add('btn-success');
+        } else if (state === 'finish') {
+            this.mainActionBtn.classList.add('btn-success');
+        }
     }
 
     updateQuestionDisplay() {
@@ -84,24 +110,25 @@ class PracticeChatApp {
         // Update progress bar
         this.updateProgressBar();
 
-        // Show/hide navigation buttons
+        // Show/hide back button
         this.backBtn.style.display = this.currentQuestionIndex > 0 ? 'inline-block' : 'none';
-        this.nextBtn.style.display = 'none'; // Hidden until answer recorded
-        this.finishBtn.style.display = 'none';
 
         // Show current answer if exists
         const currentAnswer = this.questionAnswers[this.currentQuestionIndex];
         if (currentAnswer) {
             this.currentAnswerEl.textContent = currentAnswer;
             this.currentAnswerEl.style.display = 'block';
-            this.editAnswerBtn.style.display = 'inline-block';
-            this.nextBtn.style.display = 'inline-block';
-            if (this.currentQuestionIndex === 2) {
-                this.finishBtn.style.display = 'inline-block';
+
+            // Button shows "Next Question" or "Finish"
+            if (this.currentQuestionIndex < 2) {
+                this.updateMainButton('next', 'Next Question', '→');
+            } else {
+                this.updateMainButton('finish', 'Finish', '✅');
             }
         } else {
             this.currentAnswerEl.style.display = 'none';
-            this.editAnswerBtn.style.display = 'none';
+            // Button shows "Start Recording"
+            this.updateMainButton('start', 'Start Recording', '🎤');
         }
     }
 
@@ -143,8 +170,7 @@ class PracticeChatApp {
             this.asrClient.onError = (error) => {
                 this.showStatus(`Error: ${error.message}`, 'error');
                 this.isRecording = false;
-                this.recordBtn.disabled = false;
-                this.stopBtn.disabled = true;
+                this.updateMainButton('start', 'Start Recording', '🎤');
                 this.skipBtn.disabled = false;
             };
 
@@ -152,8 +178,7 @@ class PracticeChatApp {
             await this.asrClient.start();
 
             this.isRecording = true;
-            this.recordBtn.disabled = true;
-            this.stopBtn.disabled = false;
+            this.updateMainButton('stop', 'Stop Recording', '⏹️');
             this.skipBtn.disabled = true;
             this.backBtn.disabled = true;
             this.showStatus('🎤 Recording... Speak naturally', 'recording');
@@ -162,8 +187,7 @@ class PracticeChatApp {
             console.error('Failed to start recording:', error);
             this.showStatus(`Failed to start: ${error.message}`, 'error');
             this.isRecording = false;
-            this.recordBtn.disabled = false;
-            this.stopBtn.disabled = true;
+            this.updateMainButton('start', 'Start Recording', '🎤');
         }
     }
 
@@ -172,25 +196,25 @@ class PracticeChatApp {
 
         try {
             this.showStatus('Processing... (this may take a few seconds)', 'info');
-            this.stopBtn.disabled = true;
+            this.mainActionBtn.disabled = true;
 
             // Stop recording and get transcript
             await this.asrClient.stop();
 
             this.isRecording = false;
-            this.recordBtn.disabled = false;
             this.skipBtn.disabled = false;
             this.backBtn.disabled = false;
+            this.mainActionBtn.disabled = false;
             this.showStatus('Answer recorded!', 'success');
 
         } catch (error) {
             console.error('Failed to process recording:', error);
             this.showStatus(`Processing failed: ${error.message}`, 'error');
             this.isRecording = false;
-            this.recordBtn.disabled = false;
-            this.stopBtn.disabled = true;
+            this.updateMainButton('start', 'Start Recording', '🎤');
             this.skipBtn.disabled = false;
             this.backBtn.disabled = false;
+            this.mainActionBtn.disabled = false;
         } finally {
             this.asrClient = null;
         }
@@ -199,6 +223,7 @@ class PracticeChatApp {
     processCurrentAnswer() {
         if (!this.currentTranscript.trim()) {
             this.showStatus('No answer recorded', 'warning');
+            this.updateMainButton('start', 'Start Recording', '🎤');
             return;
         }
 
@@ -211,13 +236,12 @@ class PracticeChatApp {
         // Display the answer
         this.currentAnswerEl.textContent = result.text;
         this.currentAnswerEl.style.display = 'block';
-        this.editAnswerBtn.style.display = 'inline-block';
 
-        // Show next/finish button
+        // Update main button to show Next or Finish
         if (this.currentQuestionIndex < 2) {
-            this.nextBtn.style.display = 'inline-block';
+            this.updateMainButton('next', 'Next Question', '→');
         } else {
-            this.finishBtn.style.display = 'inline-block';
+            this.updateMainButton('finish', 'Finish', '✅');
         }
 
         // Clear current transcript
@@ -249,16 +273,6 @@ class PracticeChatApp {
             this.updateQuestionDisplay();
             this.showStatus('Moved to next question', 'info');
         }
-    }
-
-    editAnswer() {
-        // Clear current answer and allow re-recording
-        this.questionAnswers[this.currentQuestionIndex] = '';
-        this.currentAnswerEl.style.display = 'none';
-        this.editAnswerBtn.style.display = 'none';
-        this.nextBtn.style.display = 'none';
-        this.finishBtn.style.display = 'none';
-        this.showStatus('Ready to re-record answer', 'info');
     }
 
     finishRecording() {

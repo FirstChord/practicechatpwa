@@ -494,3 +494,43 @@ body {
         font-size: 18px;
     }
 }
+
+/* Large Button Style */
+.btn-large {
+    width: 100%;
+    padding: 18px 24px;
+    font-size: 18px;
+    margin: 20px 0;
+}
+
+/* Link-style Button */
+.btn-link {
+    background: transparent;
+    color: var(--text-light);
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.btn-link:hover:not(:disabled) {
+    color: var(--primary-color);
+    background: transparent;
+    transform: none;
+}
+
+.btn-link:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Secondary Actions Container */
+.secondary-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}

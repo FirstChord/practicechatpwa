@@ -56,45 +56,25 @@
             <!-- Recording Controls -->
             <div class="card">
                 <h3 class="card-subtitle">Record Your Answer</h3>
-                <div class="button-group">
-                    <button id="recordBtn" class="btn btn-primary">
-                        <span class="btn-icon">🎤</span>
-                        Start Recording
-                    </button>
-                    <button id="stopBtn" class="btn btn-secondary" disabled>
-                        <span class="btn-icon">⏹️</span>
-                        Stop Recording
-                    </button>
-                </div>
+
+                <!-- Main Action Button -->
+                <button id="mainActionBtn" class="btn btn-primary btn-large">
+                    <span class="btn-icon">🎤</span>
+                    <span id="mainActionText">Start Recording</span>
+                </button>
 
                 <!-- Current Answer Display -->
                 <div id="currentAnswer" class="answer-box" style="display: none;">
                     Your answer will appear here...
                 </div>
-            </div>
 
-            <!-- Navigation Controls -->
-            <div class="card">
-                <div class="button-group">
-                    <button id="backBtn" class="btn btn-secondary" style="display: none;">
-                        <span class="btn-icon">←</span>
-                        Back
+                <!-- Secondary Actions -->
+                <div class="secondary-actions">
+                    <button id="backBtn" class="btn-link" style="display: none;">
+                        ← Back
                     </button>
-                    <button id="skipBtn" class="btn btn-warning">
-                        <span class="btn-icon">⏭️</span>
-                        Skip Question
-                    </button>
-                    <button id="editAnswerBtn" class="btn btn-info" style="display: none;">
-                        <span class="btn-icon">✏️</span>
-                        Re-record
-                    </button>
-                    <button id="nextBtn" class="btn btn-success" style="display: none;">
-                        <span class="btn-icon">→</span>
-                        Next Question
-                    </button>
-                    <button id="finishBtn" class="btn btn-success" style="display: none;">
-                        <span class="btn-icon">✅</span>
-                        Finish
+                    <button id="skipBtn" class="btn-link">
+                        Skip Question →
                     </button>
                 </div>
             </div>
@@ -103,23 +83,21 @@
         <!-- Output Section -->
         <div id="outputSection" class="output-section">
             <div class="card">
-                <h3 class="card-subtitle">Lesson Notes</h3>
+                <h3 class="card-subtitle">✅ Lesson Notes Complete</h3>
                 <div id="processed" class="output-box">
                     Processed notes will appear here...
                 </div>
 
-                <div class="button-group">
-                    <button id="copyBtn" class="btn btn-success">
-                        <span class="btn-icon">📋</span>
-                        Copy Notes
-                    </button>
-                    <button id="newBtn" class="btn btn-secondary">
-                        <span class="btn-icon">✨</span>
-                        New Recording
-                    </button>
-                    <button id="clearBtn" class="btn btn-danger">
-                        <span class="btn-icon">🗑️</span>
-                        Clear All
+                <!-- Main Copy Button -->
+                <button id="copyBtn" class="btn btn-success btn-large">
+                    <span class="btn-icon">📋</span>
+                    Copy Notes
+                </button>
+
+                <!-- Secondary Actions -->
+                <div class="secondary-actions">
+                    <button id="newBtn" class="btn-link">
+                        ✨ New Recording
                     </button>
                 </div>
             </div>
