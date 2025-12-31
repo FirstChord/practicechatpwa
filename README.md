@@ -2,8 +2,9 @@
 
 Progressive Web App for capturing lesson conversations and practice reflections.
 
-**Status**: ✅ MVP Ready
+**Status**: ✅ Live in Production
 **Version**: 1.0.0
+**Live URL**: https://practice-chat-pwa.web.app
 **Converted from**: HW Notes 3 Chrome Extension
 
 ---
