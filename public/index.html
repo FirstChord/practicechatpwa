@@ -33,38 +33,77 @@
         <!-- Status Message -->
         <div id="status" class="status" style="display: none;"></div>
 
-        <!-- Instructions Card -->
-        <div class="card">
-            <h2 class="card-title">Record Lesson Notes</h2>
-            <p class="card-description">
-                Have a natural conversation about the lesson - what you worked on together,
-                how it went, and what to focus on next.
-            </p>
-
-            <div class="button-group">
-                <button id="recordBtn" class="btn btn-primary">
-                    <span class="btn-icon">🎤</span>
-                    Start Recording
-                </button>
-                <button id="stopBtn" class="btn btn-secondary" disabled>
-                    <span class="btn-icon">⏹️</span>
-                    Stop Recording
-                </button>
+        <!-- Question Section -->
+        <div id="questionSection">
+            <!-- Question Progress -->
+            <div class="card">
+                <div class="question-progress-bar">
+                    <div class="progress-item active">1</div>
+                    <div class="progress-line"></div>
+                    <div class="progress-item">2</div>
+                    <div class="progress-line"></div>
+                    <div class="progress-item">3</div>
+                </div>
+                <div class="question-header">
+                    <h2 id="questionNumber" class="question-number">Question 1 of 3</h2>
+                    <span id="questionProgress" class="question-badge">1/3</span>
+                </div>
+                <div class="question-text-container">
+                    <p id="questionText" class="question-text">What did we do in the lesson?</p>
+                </div>
             </div>
-        </div>
 
-        <!-- Transcript Card -->
-        <div class="card">
-            <h3 class="card-subtitle">Raw Transcript</h3>
-            <div id="transcript" class="transcript-box">
-                Transcript will appear here...
+            <!-- Recording Controls -->
+            <div class="card">
+                <h3 class="card-subtitle">Record Your Answer</h3>
+                <div class="button-group">
+                    <button id="recordBtn" class="btn btn-primary">
+                        <span class="btn-icon">🎤</span>
+                        Start Recording
+                    </button>
+                    <button id="stopBtn" class="btn btn-secondary" disabled>
+                        <span class="btn-icon">⏹️</span>
+                        Stop Recording
+                    </button>
+                </div>
+
+                <!-- Current Answer Display -->
+                <div id="currentAnswer" class="answer-box" style="display: none;">
+                    Your answer will appear here...
+                </div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="card">
+                <div class="button-group">
+                    <button id="backBtn" class="btn btn-secondary" style="display: none;">
+                        <span class="btn-icon">←</span>
+                        Back
+                    </button>
+                    <button id="skipBtn" class="btn btn-warning">
+                        <span class="btn-icon">⏭️</span>
+                        Skip Question
+                    </button>
+                    <button id="editAnswerBtn" class="btn btn-info" style="display: none;">
+                        <span class="btn-icon">✏️</span>
+                        Re-record
+                    </button>
+                    <button id="nextBtn" class="btn btn-success" style="display: none;">
+                        <span class="btn-icon">→</span>
+                        Next Question
+                    </button>
+                    <button id="finishBtn" class="btn btn-success" style="display: none;">
+                        <span class="btn-icon">✅</span>
+                        Finish
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- Output Section -->
         <div id="outputSection" class="output-section">
             <div class="card">
-                <h3 class="card-subtitle">Processed Notes</h3>
+                <h3 class="card-subtitle">Lesson Notes</h3>
                 <div id="processed" class="output-box">
                     Processed notes will appear here...
                 </div>

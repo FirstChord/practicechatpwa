@@ -1,39 +1,124 @@
 // Practice Chat - Main Application
-// Handles recording, transcription, and UI
+// Handles recording, transcription, and UI with three-question flow
 
 import { WhisperASRClient } from './asr-client.js';
 import { enhancedCleanupSpeechText } from './text-processor.js';
+
+const QUESTIONS = [
+    "What did we do in the lesson?",
+    "What went well or what was challenging?",
+    "What would be good practice over the week? (and how!)"
+];
+
+const QUESTION_LABELS = [
+    "What we did:",
+    "Progress & Challenges:",
+    "Practice Goals:"
+];
 
 class PracticeChatApp {
     constructor() {
         this.asrClient = null;
         this.isRecording = false;
-        this.rawTranscript = '';
+        this.currentQuestionIndex = 0;
+        this.questionAnswers = ['', '', '']; // Store answers for each question
+        this.currentTranscript = '';
 
         this.initializeElements();
         this.bindEvents();
+        this.updateQuestionDisplay();
         this.loadPreviousNotes();
     }
 
     initializeElements() {
+        // Question elements
+        this.questionNumberEl = document.getElementById('questionNumber');
+        this.questionTextEl = document.getElementById('questionText');
+        this.questionProgressEl = document.getElementById('questionProgress');
+
+        // Recording buttons
         this.recordBtn = document.getElementById('recordBtn');
         this.stopBtn = document.getElementById('stopBtn');
+
+        // Navigation buttons
+        this.skipBtn = document.getElementById('skipBtn');
+        this.backBtn = document.getElementById('backBtn');
+        this.nextBtn = document.getElementById('nextBtn');
+        this.finishBtn = document.getElementById('finishBtn');
+
+        // Answer display
+        this.currentAnswerEl = document.getElementById('currentAnswer');
+        this.editAnswerBtn = document.getElementById('editAnswerBtn');
+
+        // Output elements
         this.copyBtn = document.getElementById('copyBtn');
         this.clearBtn = document.getElementById('clearBtn');
         this.newBtn = document.getElementById('newBtn');
-
         this.statusEl = document.getElementById('status');
-        this.transcriptEl = document.getElementById('transcript');
         this.processedEl = document.getElementById('processed');
         this.outputSection = document.getElementById('outputSection');
+
+        // Question section
+        this.questionSection = document.getElementById('questionSection');
     }
 
     bindEvents() {
         this.recordBtn.addEventListener('click', () => this.startRecording());
         this.stopBtn.addEventListener('click', () => this.stopRecording());
+        this.skipBtn.addEventListener('click', () => this.skipQuestion());
+        this.backBtn.addEventListener('click', () => this.previousQuestion());
+        this.nextBtn.addEventListener('click', () => this.nextQuestion());
+        this.finishBtn.addEventListener('click', () => this.finishRecording());
+        this.editAnswerBtn.addEventListener('click', () => this.editAnswer());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.clearBtn.addEventListener('click', () => this.clearNotes());
         this.newBtn.addEventListener('click', () => this.resetForNew());
+    }
+
+    updateQuestionDisplay() {
+        const questionNum = this.currentQuestionIndex + 1;
+        this.questionNumberEl.textContent = `Question ${questionNum} of 3`;
+        this.questionTextEl.textContent = QUESTIONS[this.currentQuestionIndex];
+        this.questionProgressEl.textContent = `${questionNum}/3`;
+
+        // Update progress bar
+        this.updateProgressBar();
+
+        // Show/hide navigation buttons
+        this.backBtn.style.display = this.currentQuestionIndex > 0 ? 'inline-block' : 'none';
+        this.nextBtn.style.display = 'none'; // Hidden until answer recorded
+        this.finishBtn.style.display = 'none';
+
+        // Show current answer if exists
+        const currentAnswer = this.questionAnswers[this.currentQuestionIndex];
+        if (currentAnswer) {
+            this.currentAnswerEl.textContent = currentAnswer;
+            this.currentAnswerEl.style.display = 'block';
+            this.editAnswerBtn.style.display = 'inline-block';
+            this.nextBtn.style.display = 'inline-block';
+            if (this.currentQuestionIndex === 2) {
+                this.finishBtn.style.display = 'inline-block';
+            }
+        } else {
+            this.currentAnswerEl.style.display = 'none';
+            this.editAnswerBtn.style.display = 'none';
+        }
+    }
+
+    updateProgressBar() {
+        const progressItems = document.querySelectorAll('.progress-item');
+
+        progressItems.forEach((item, index) => {
+            // Remove all classes
+            item.classList.remove('active', 'completed');
+
+            // Add appropriate class
+            if (index < this.currentQuestionIndex) {
+                item.classList.add('completed');
+            } else if (index === this.currentQuestionIndex) {
+                item.classList.add('active');
+            }
+        });
     }
 
     async startRecording() {
@@ -46,13 +131,13 @@ class PracticeChatApp {
             // Set up callbacks
             this.asrClient.onPartialTranscript = (text) => {
                 // Show fun processing messages
-                this.transcriptEl.textContent = text;
+                this.currentAnswerEl.textContent = text;
+                this.currentAnswerEl.style.display = 'block';
             };
 
             this.asrClient.onFinalTranscript = (text) => {
-                this.rawTranscript = text;
-                this.transcriptEl.textContent = text;
-                this.processTranscript();
+                this.currentTranscript = text;
+                this.processCurrentAnswer();
             };
 
             this.asrClient.onError = (error) => {
@@ -60,6 +145,7 @@ class PracticeChatApp {
                 this.isRecording = false;
                 this.recordBtn.disabled = false;
                 this.stopBtn.disabled = true;
+                this.skipBtn.disabled = false;
             };
 
             // Start recording
@@ -68,8 +154,9 @@ class PracticeChatApp {
             this.isRecording = true;
             this.recordBtn.disabled = true;
             this.stopBtn.disabled = false;
-            this.showStatus('🎤 Recording... Speak naturally about the lesson', 'recording');
-            this.transcriptEl.textContent = 'Listening...';
+            this.skipBtn.disabled = true;
+            this.backBtn.disabled = true;
+            this.showStatus('🎤 Recording... Speak naturally', 'recording');
 
         } catch (error) {
             console.error('Failed to start recording:', error);
@@ -92,7 +179,9 @@ class PracticeChatApp {
 
             this.isRecording = false;
             this.recordBtn.disabled = false;
-            this.showStatus('Recording complete!', 'success');
+            this.skipBtn.disabled = false;
+            this.backBtn.disabled = false;
+            this.showStatus('Answer recorded!', 'success');
 
         } catch (error) {
             console.error('Failed to process recording:', error);
@@ -100,29 +189,106 @@ class PracticeChatApp {
             this.isRecording = false;
             this.recordBtn.disabled = false;
             this.stopBtn.disabled = true;
+            this.skipBtn.disabled = false;
+            this.backBtn.disabled = false;
         } finally {
             this.asrClient = null;
         }
     }
 
-    processTranscript() {
-        if (!this.rawTranscript.trim()) {
-            this.showStatus('No transcript to process', 'warning');
+    processCurrentAnswer() {
+        if (!this.currentTranscript.trim()) {
+            this.showStatus('No answer recorded', 'warning');
             return;
         }
 
         // Clean up the text
-        const result = enhancedCleanupSpeechText(this.rawTranscript);
+        const result = enhancedCleanupSpeechText(this.currentTranscript);
 
-        // Display processed text
-        this.processedEl.textContent = result.text;
+        // Store the answer for this question
+        this.questionAnswers[this.currentQuestionIndex] = result.text;
+
+        // Display the answer
+        this.currentAnswerEl.textContent = result.text;
+        this.currentAnswerEl.style.display = 'block';
+        this.editAnswerBtn.style.display = 'inline-block';
+
+        // Show next/finish button
+        if (this.currentQuestionIndex < 2) {
+            this.nextBtn.style.display = 'inline-block';
+        } else {
+            this.finishBtn.style.display = 'inline-block';
+        }
+
+        // Clear current transcript
+        this.currentTranscript = '';
+
+        console.log('Answer processed:', result.enhancements);
+    }
+
+    skipQuestion() {
+        this.questionAnswers[this.currentQuestionIndex] = '';
+        if (this.currentQuestionIndex < 2) {
+            this.nextQuestion();
+        } else {
+            this.finishRecording();
+        }
+    }
+
+    previousQuestion() {
+        if (this.currentQuestionIndex > 0) {
+            this.currentQuestionIndex--;
+            this.updateQuestionDisplay();
+            this.showStatus('Moved to previous question', 'info');
+        }
+    }
+
+    nextQuestion() {
+        if (this.currentQuestionIndex < 2) {
+            this.currentQuestionIndex++;
+            this.updateQuestionDisplay();
+            this.showStatus('Moved to next question', 'info');
+        }
+    }
+
+    editAnswer() {
+        // Clear current answer and allow re-recording
+        this.questionAnswers[this.currentQuestionIndex] = '';
+        this.currentAnswerEl.style.display = 'none';
+        this.editAnswerBtn.style.display = 'none';
+        this.nextBtn.style.display = 'none';
+        this.finishBtn.style.display = 'none';
+        this.showStatus('Ready to re-record answer', 'info');
+    }
+
+    finishRecording() {
+        // Generate structured output
+        this.generateStructuredOutput();
+
+        // Hide question section
+        this.questionSection.style.display = 'none';
+
+        // Show output section
         this.outputSection.classList.add('show');
 
-        // Save to localStorage
-        this.saveNotes(result.text);
-
-        console.log('Enhancements:', result.enhancements);
+        this.showStatus('Lesson notes complete!', 'success');
     }
+
+    generateStructuredOutput() {
+        let output = '';
+
+        for (let i = 0; i < 3; i++) {
+            if (this.questionAnswers[i]) {
+                output += `${QUESTION_LABELS[i]}\n${this.questionAnswers[i]}\n\n`;
+            }
+        }
+
+        this.processedEl.textContent = output.trim();
+
+        // Save to localStorage
+        this.saveNotes(output.trim());
+    }
+
 
     async copyToClipboard() {
         const text = this.processedEl.textContent;
@@ -150,22 +316,29 @@ class PracticeChatApp {
     clearNotes() {
         if (!confirm('Clear all notes? This cannot be undone.')) return;
 
-        this.rawTranscript = '';
-        this.transcriptEl.textContent = 'Transcript will appear here...';
+        this.currentQuestionIndex = 0;
+        this.questionAnswers = ['', '', ''];
+        this.currentTranscript = '';
         this.processedEl.textContent = 'Processed notes will appear here...';
         this.outputSection.classList.remove('show');
+        this.questionSection.style.display = 'block';
 
         localStorage.removeItem('lastNotes');
         localStorage.removeItem('lastNotesTimestamp');
 
+        this.updateQuestionDisplay();
         this.showStatus('Notes cleared', 'info');
     }
 
     resetForNew() {
-        this.rawTranscript = '';
-        this.transcriptEl.textContent = 'Transcript will appear here...';
+        this.currentQuestionIndex = 0;
+        this.questionAnswers = ['', '', ''];
+        this.currentTranscript = '';
         this.processedEl.textContent = 'Processed notes will appear here...';
         this.outputSection.classList.remove('show');
+        this.questionSection.style.display = 'block';
+
+        this.updateQuestionDisplay();
         this.showStatus('Ready for new recording', 'info');
     }
 

@@ -360,3 +360,137 @@ body {
 .output-box::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
 }
+
+/* Question Flow Styles */
+.question-progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    padding: 15px 0;
+}
+
+.progress-item {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.progress-item.active {
+    background: var(--primary-color);
+    color: white;
+    transform: scale(1.1);
+}
+
+.progress-item.completed {
+    background: var(--success-color);
+    color: white;
+}
+
+.progress-line {
+    width: 60px;
+    height: 2px;
+    background: rgba(0, 0, 0, 0.1);
+    margin: 0 10px;
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.question-number {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.question-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.question-text-container {
+    background: rgba(87, 65, 217, 0.05);
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid var(--secondary-color);
+}
+
+.question-text {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-dark);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.answer-box {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 100px;
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-dark);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin-top: 15px;
+    font-weight: 500;
+}
+
+/* Additional Button Styles */
+.btn-warning {
+    background: var(--warning-color);
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: #FB8C00;
+}
+
+.btn-info {
+    background: var(--info-color);
+}
+
+.btn-info:hover:not(:disabled) {
+    background: #4532b8;
+}
+
+/* Responsive Question Flow */
+@media (max-width: 768px) {
+    .progress-item {
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+    }
+
+    .progress-line {
+        width: 40px;
+    }
+
+    .question-text {
+        font-size: 16px;
+    }
+
+    .question-number {
+        font-size: 18px;
+    }
+}
