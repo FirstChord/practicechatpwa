@@ -323,11 +323,17 @@ class PracticeChatApp {
             await navigator.clipboard.writeText(text);
             this.showStatus('✅ Copied to clipboard!', 'success');
 
-            const originalText = this.copyBtn.textContent;
-            this.copyBtn.textContent = '✅ Copied!';
-            setTimeout(() => {
-                this.copyBtn.textContent = originalText;
-            }, 2000);
+            // Change button to "Return to Dashboard"
+            this.copyBtn.innerHTML = '<span class="btn-icon">🏠</span>Return to Dashboard';
+            this.copyBtn.onclick = () => {
+                window.location.href = 'https://firstchord.co.uk/dashboard';
+            };
+
+            // Show attendance reminder
+            const reminderEl = document.getElementById('attendanceReminder');
+            if (reminderEl) {
+                reminderEl.style.display = 'block';
+            }
         } catch (error) {
             console.error('Copy failed:', error);
             this.showStatus('Failed to copy', 'error');
@@ -358,6 +364,16 @@ class PracticeChatApp {
         this.processedEl.textContent = 'Processed notes will appear here...';
         this.outputSection.classList.remove('show');
         this.questionSection.style.display = 'block';
+
+        // Reset copy button
+        this.copyBtn.innerHTML = '<span class="btn-icon">📋</span>Copy Notes';
+        this.copyBtn.onclick = () => this.copyToClipboard();
+
+        // Hide attendance reminder
+        const reminderEl = document.getElementById('attendanceReminder');
+        if (reminderEl) {
+            reminderEl.style.display = 'none';
+        }
 
         this.updateQuestionDisplay();
         this.showStatus('Ready for new recording', 'info');

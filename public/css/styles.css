@@ -534,3 +534,20 @@ body {
     padding-top: 15px;
     border-top: 1px solid var(--border-color);
 }
+
+/* Attendance Reminder */
+.attendance-reminder {
+    background: rgba(87, 65, 217, 0.08);
+    border: 1px solid rgba(87, 65, 217, 0.2);
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-top: 15px;
+    text-align: center;
+}
+
+.attendance-reminder p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--secondary-color);
+    font-weight: 600;
+}
