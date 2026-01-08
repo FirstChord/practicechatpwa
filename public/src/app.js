@@ -253,7 +253,10 @@ class PracticeChatApp {
     skipQuestion() {
         this.questionAnswers[this.currentQuestionIndex] = '';
         if (this.currentQuestionIndex < 2) {
-            this.nextQuestion();
+            this.currentQuestionIndex++;
+            this.updateQuestionDisplay();
+            // Automatically start recording for the next question
+            this.startRecording();
         } else {
             this.finishRecording();
         }
@@ -262,8 +265,11 @@ class PracticeChatApp {
     previousQuestion() {
         if (this.currentQuestionIndex > 0) {
             this.currentQuestionIndex--;
+            // Clear the previous answer to allow re-recording
+            this.questionAnswers[this.currentQuestionIndex] = '';
             this.updateQuestionDisplay();
-            this.showStatus('Moved to previous question', 'info');
+            // Automatically start recording for the previous question
+            this.startRecording();
         }
     }
 
@@ -271,7 +277,8 @@ class PracticeChatApp {
         if (this.currentQuestionIndex < 2) {
             this.currentQuestionIndex++;
             this.updateQuestionDisplay();
-            this.showStatus('Moved to next question', 'info');
+            // Automatically start recording for the next question
+            this.startRecording();
         }
     }
 
