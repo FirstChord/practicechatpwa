@@ -323,10 +323,10 @@ class PracticeChatApp {
             await navigator.clipboard.writeText(text);
             this.showStatus('✅ Copied to clipboard!', 'success');
 
-            // Change button to "Return to Dashboard"
-            this.copyBtn.innerHTML = '<span class="btn-icon">🏠</span>Return to Dashboard';
+            // Change button to "Take Attendance"
+            this.copyBtn.innerHTML = '<span class="btn-icon">✅</span>Take Attendance';
             this.copyBtn.onclick = () => {
-                window.location.href = 'https://firstchord.co.uk/dashboard';
+                window.location.href = 'https://mymusicstaff.com';
             };
 
             // Show attendance reminder
