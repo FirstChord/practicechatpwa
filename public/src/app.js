@@ -255,8 +255,6 @@ class PracticeChatApp {
         if (this.currentQuestionIndex < 2) {
             this.currentQuestionIndex++;
             this.updateQuestionDisplay();
-            // Automatically start recording for the next question
-            this.startRecording();
         } else {
             this.finishRecording();
         }
@@ -268,8 +266,6 @@ class PracticeChatApp {
             // Clear the previous answer to allow re-recording
             this.questionAnswers[this.currentQuestionIndex] = '';
             this.updateQuestionDisplay();
-            // Automatically start recording for the previous question
-            this.startRecording();
         }
     }
 
@@ -277,8 +273,6 @@ class PracticeChatApp {
         if (this.currentQuestionIndex < 2) {
             this.currentQuestionIndex++;
             this.updateQuestionDisplay();
-            // Automatically start recording for the next question
-            this.startRecording();
         }
     }
 
