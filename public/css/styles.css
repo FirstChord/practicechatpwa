@@ -306,6 +306,12 @@ body {
     font-weight: 500;
 }
 
+.output-box[contenteditable="true"]:focus {
+    outline: 3px solid rgba(62, 141, 88, 0.22);
+    border-color: var(--primary-color);
+    background: #fff;
+}
+
 /* Output Section */
 .output-section {
     display: none;

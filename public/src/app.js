@@ -3,6 +3,11 @@
 
 import { WhisperASRClient } from './asr-client.js';
 import { enhancedCleanupSpeechText } from './text-processor.js';
+import {
+    buildPracticeNoteSnapshot,
+    getPracticeChatContext,
+    savePracticeNoteSnapshot
+} from './practice-note-sync.js';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -23,6 +28,9 @@ class PracticeChatApp {
         this.currentQuestionIndex = 0;
         this.questionAnswers = ['', '', '']; // Store answers for each question
         this.currentTranscript = '';
+        this.context = getPracticeChatContext(window.location.search);
+        this.lastDashboardSavedText = '';
+        this.dashboardSaveInFlight = false;
 
         this.initializeElements();
         this.bindEvents();
@@ -319,9 +327,7 @@ class PracticeChatApp {
 
             // Change button to "Take Attendance"
             this.copyBtn.innerHTML = '<span class="btn-icon">✅</span>Take Attendance';
-            this.copyBtn.onclick = () => {
-                window.location.href = 'https://mymusicstaff.com';
-            };
+            this.copyBtn.onclick = () => this.takeAttendance();
 
             // Show attendance reminder
             const reminderEl = document.getElementById('attendanceReminder');
@@ -332,6 +338,38 @@ class PracticeChatApp {
             console.error('Copy failed:', error);
             this.showStatus('Failed to copy', 'error');
         }
+    }
+
+    async takeAttendance() {
+        if (this.dashboardSaveInFlight) {
+            return;
+        }
+
+        const text = this.processedEl.textContent;
+        const snapshot = buildPracticeNoteSnapshot({
+            context: this.context,
+            noteText: text
+        });
+
+        this.dashboardSaveInFlight = true;
+        this.copyBtn.disabled = true;
+        if (snapshot && snapshot.rawNoteText !== this.lastDashboardSavedText) {
+            try {
+                const result = await savePracticeNoteSnapshot({
+                    dashboardBaseUrl: this.context.dashboardBaseUrl,
+                    snapshot
+                });
+                this.lastDashboardSavedText = snapshot.rawNoteText;
+                if (result.noteId) {
+                    console.log('✅ Practice note snapshot saved:', result.noteId);
+                }
+            } catch (error) {
+                console.warn('Practice note snapshot save failed; continuing to MMS:', error);
+                this.showStatus('Notes copied. Dashboard snapshot did not save, but you can still finish in MMS.', 'warning');
+            }
+        }
+
+        window.location.href = 'https://mymusicstaff.com';
     }
 
     clearNotes() {

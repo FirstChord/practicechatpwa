@@ -40,6 +40,7 @@ Practice Chat PWA
 │   ├── css/styles.css      # Styling
 │   └── src/
 │       ├── app.js          # Main app logic
+│       ├── practice-note-sync.js # Optional dashboard snapshot handoff
 │       ├── asr-client.js   # Speech recognition
 │       └── text-processor.js # Text cleanup
 │
@@ -130,7 +131,9 @@ Once deployed, users can install the app:
 3. **Watch live transcript** appear in real-time
 4. **Click "Stop Recording"** when done
 5. **Review processed notes** - cleaned up and formatted
-6. **Click "Copy Notes"** - paste into your lesson system
+6. **Edit if needed** - the final note box is editable before copying
+7. **Click "Copy Notes"** - paste into your lesson system
+8. **Click "Take Attendance"** - opens MMS so the tutor can mark attendance and send the parent email
 
 ---
 
@@ -151,7 +154,8 @@ Once deployed, users can install the app:
 
 ### Storage
 - **localStorage**: Saves last notes (clears after 24 hours)
-- **No backend database**: Everything is client-side except transcription
+- **Dashboard snapshot**: When opened from a dashboard student link, clicking `Take Attendance` sends a best-effort copy to the dashboard `Practice_Notes_Log` tab before opening MMS
+- **MMS remains completion truth**: Tutors still mark attendance and send parent notes manually in MMS
 
 ---
 
@@ -159,8 +163,28 @@ Once deployed, users can install the app:
 
 - **Microphone**: Only used during active recording, immediately released
 - **Transcription**: Processed via OpenAI API through secure relay
-- **Storage**: Notes stored locally in browser, never sent to servers
+- **Storage**: Notes are stored locally in the browser. If opened from a dashboard student link, the generated note is also sent to the private dashboard as an append-only snapshot.
 - **No tracking**: No analytics, no cookies, no user tracking
+
+---
+
+## Dashboard Handoff
+
+Dashboard quick links can open Practice Chat with context:
+
+```text
+https://practice-chat-pwa.web.app/?studentId=sdt_123&studentName=Ada%20Lovelace&tutor=Dean&dashboardBaseUrl=https%3A%2F%2Fdashboard.example
+```
+
+When those parameters are present, `Take Attendance` posts to:
+
+```text
+{dashboardBaseUrl}/api/practice-notes
+```
+
+The save is best-effort. If the dashboard snapshot fails, the app warns in the console/UI but still opens MMS. This preserves the tutor workflow.
+
+Rollback path: revert the dashboard `Practice_Notes_Log` commit and this PWA handoff commit. The older copy/open-MMS flow does not depend on the snapshot endpoint.
 
 ---
 
@@ -190,6 +214,7 @@ Practice Chat PWA/
 │   │   └── styles.css     # All styles
 │   ├── src/               # JavaScript modules
 │   │   ├── app.js         # Main app
+│   │   ├── practice-note-sync.js # Dashboard snapshot helper
 │   │   ├── asr-client.js  # Speech recognition
 │   │   └── text-processor.js # Text cleanup
 │   └── icons/             # PWA icons
@@ -200,8 +225,9 @@ Practice Chat PWA/
 
 ### Making Changes
 1. Edit files in `public/`
-2. Test locally: `python3 -m http.server 8000` (from public/)
-3. Deploy: `firebase deploy --only hosting`
+2. Run tests: `npm test`
+3. Test locally: `python3 -m http.server 8000 --directory public`
+4. Deploy: `firebase deploy --only hosting`
 
 ---
 

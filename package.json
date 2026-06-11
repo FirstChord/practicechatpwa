@@ -4,6 +4,7 @@
   "description": "Progressive Web App for capturing lesson conversations and practice reflections using Whisper API",
   "scripts": {
     "dev": "python3 -m http.server 8000 --directory public",
+    "test": "node --test tests/*.test.mjs",
     "deploy": "firebase deploy --only hosting",
     "firebase:login": "firebase login",
     "firebase:init": "firebase init"
