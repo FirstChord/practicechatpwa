@@ -11,9 +11,9 @@ const QUESTIONS = [
 ];
 
 const QUESTION_LABELS = [
-    "What we did:",
-    "Progress & Challenges:",
-    "Practice Goals:"
+    "[What we did]",
+    "[Progress & Challenges]",
+    "[Practice Goals]"
 ];
 
 class PracticeChatApp {
