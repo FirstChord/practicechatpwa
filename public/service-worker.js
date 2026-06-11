@@ -3,7 +3,7 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v1';
+const CACHE_NAME = 'practice-chat-v2';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
@@ -51,6 +51,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
+  if (request.method !== 'GET') {
+    return; // Only GET requests can be cached.
+  }
+
   // Skip WebSocket and external API requests
   if (request.url.startsWith('wss://') ||
       request.url.includes('railway.app') ||
@@ -62,8 +66,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Clone and cache successful responses
-        if (response.status === 200) {
+        // Clone and cache successful same-origin GET responses
+        if (response.status === 200 && new URL(request.url).origin === self.location.origin) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);
