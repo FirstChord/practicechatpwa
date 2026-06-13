@@ -156,6 +156,13 @@ body {
     margin-bottom: 20px;
 }
 
+.review-helper {
+    margin: -4px 0 12px;
+    color: var(--text-light);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
 /* Status Messages */
 .status {
     padding: 15px 20px;
@@ -206,6 +213,174 @@ body {
     }
 }
 
+.mms-test-panel {
+    border: 1px solid rgba(255, 167, 38, 0.35);
+    background: rgba(255, 167, 38, 0.08);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 16px;
+}
+
+.mms-test-copy {
+    display: grid;
+    gap: 4px;
+    color: var(--text-dark);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.mms-test-copy span {
+    color: var(--text-light);
+}
+
+.mms-test-checklist {
+    margin-top: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    padding: 12px;
+    color: var(--text-dark);
+    font-size: 13px;
+}
+
+.mms-test-checklist span {
+    font-weight: 700;
+}
+
+.mms-test-checklist ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.mms-test-checklist li {
+    margin: 3px 0;
+}
+
+.mms-test-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.mms-test-preview {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--text-dark);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.preview-date {
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.date-confirmation {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid rgba(76, 175, 80, 0.28);
+    background: rgba(76, 175, 80, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+.date-confirmation input {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    flex: 0 0 auto;
+}
+
+.date-select-label {
+    display: block;
+    margin: 10px 0 4px;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.date-select {
+    width: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    background: white;
+    color: var(--text-dark);
+    font-size: 14px;
+    padding: 10px;
+}
+
+.preview-loading {
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.mms-test-preview ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.mms-test-preview li {
+    margin: 3px 0;
+}
+
+.mms-test-preview li.selected {
+    font-weight: 700;
+    color: var(--warning-color);
+}
+
+.completion-title {
+    color: var(--success-color);
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.warning-title {
+    color: var(--warning-color);
+}
+
+.completion-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.completion-list li {
+    margin: 5px 0;
+}
+
+.manual-follow-up {
+    margin-top: 10px;
+    border-radius: 8px;
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid rgba(255, 152, 0, 0.24);
+    padding: 10px;
+    color: var(--text-dark);
+    font-size: 13px;
+}
+
+.saving-title {
+    color: var(--primary-color);
+    font-size: 17px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.saving-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.saving-list li {
+    margin: 5px 0;
+}
+
 /* Buttons */
 .button-group {
     display: grid;
@@ -233,6 +408,26 @@ body {
 .btn:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn.is-loading {
+    opacity: 0.86;
+    cursor: wait;
+}
+
+.button-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.42);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .btn:active:not(:disabled) {

@@ -1,4 +1,6 @@
 const DEFAULT_SOURCE = 'practice_chat_pwa';
+export const TEST_MMS_WRITE_STUDENT_ID = 'sdt_fBg9JN';
+export const LEVEL_2_PILOT_TUTORS = ['Finn', 'Tom', 'Fennella'];
 
 function clean(value = '') {
     return `${value || ''}`.trim();
@@ -22,8 +24,18 @@ export function getPracticeChatContext(search = '') {
         studentId: clean(params.get('studentId')),
         studentName: clean(params.get('studentName')),
         tutor: clean(params.get('tutor')),
+        practiceChatSecret: clean(params.get('practiceChatSecret')),
         dashboardBaseUrl: clean(params.get('dashboardBaseUrl')).replace(/\/+$/u, '')
     };
+}
+
+function normalisePilotTutor(value = '') {
+    const cleaned = clean(value).toLowerCase();
+    if (!cleaned) return '';
+    if (cleaned === 'finn' || cleaned.includes('finn le marinel')) return 'Finn';
+    if (cleaned === 'tom' || cleaned.includes('tom walters')) return 'Tom';
+    if (cleaned === 'fennella' || cleaned.includes('fennella mccallum')) return 'Fennella';
+    return clean(value);
 }
 
 export function splitStructuredNoteText(text = '') {
@@ -86,10 +98,14 @@ export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot
         return { skipped: true };
     }
 
+    const { practiceChatSecret = '', ...snapshotPayload } = snapshot;
     const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(snapshot)
+        headers: {
+            'Content-Type': 'application/json',
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        },
+        body: JSON.stringify(snapshotPayload)
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -98,4 +114,65 @@ export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot
     }
 
     return payload;
+}
+
+export function isLocalMmsWriteTestAvailable({ context = {}, hostname = window.location.hostname } = {}) {
+    const dashboardBaseUrl = clean(context.dashboardBaseUrl);
+    const tutor = normalisePilotTutor(context.tutor);
+    const isPilotTutor = LEVEL_2_PILOT_TUTORS.includes(tutor);
+    const isTestStudent = context.studentId === TEST_MMS_WRITE_STUDENT_ID;
+    const isAllowedHost = Boolean(hostname) && (
+        hostname === 'localhost'
+        || hostname === '127.0.0.1'
+        || hostname === 'practice-chat-pwa.web.app'
+    );
+    return Boolean(context.studentId && dashboardBaseUrl && isAllowedHost && (isPilotTutor || isTestStudent));
+}
+
+async function callPracticeNoteMmsTestRoute({
+    dashboardBaseUrl = '',
+    studentId = '',
+    noteText = '',
+    mode = 'dry_run',
+    targetAttendanceId = '',
+    noteSnapshot = null,
+    practiceChatSecret = '',
+    fetchImpl = fetch
+} = {}) {
+    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/mms-test`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        },
+        body: JSON.stringify({
+            studentMmsId: studentId,
+            noteText,
+            mode,
+            targetAttendanceId,
+            noteSnapshot,
+            confirmLevel2Pilot: mode === 'execute'
+        })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || `MMS test write failed (${response.status})`);
+    }
+
+    return payload;
+}
+
+export function previewPracticeNoteMmsTestWrite(options = {}) {
+    return callPracticeNoteMmsTestRoute({
+        ...options,
+        mode: 'dry_run'
+    });
+}
+
+export function executePracticeNoteMmsTestWrite(options = {}) {
+    return callPracticeNoteMmsTestRoute({
+        ...options,
+        mode: 'execute'
+    });
 }

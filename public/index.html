@@ -85,12 +85,13 @@
         <!-- Output Section -->
         <div id="outputSection" class="output-section">
             <div class="card">
-                <h3 class="card-subtitle">✅ Lesson Notes Complete</h3>
+                <h3 class="card-subtitle">Review Lesson Notes</h3>
+                <p class="review-helper">You can edit these notes here before saving. This is the final note that will be saved and sent.</p>
                 <div id="processed" class="output-box" contenteditable="true" spellcheck="true" aria-label="Editable lesson notes">
                     Processed notes will appear here...
                 </div>
 
-                <!-- Main Copy Button -->
+                <!-- Main Copy Button / fallback action -->
                 <button id="copyBtn" class="btn btn-success btn-large">
                     <span class="btn-icon">📋</span>
                     Copy Notes
@@ -99,6 +100,25 @@
                 <!-- Attendance Reminder -->
                 <div id="attendanceReminder" class="attendance-reminder" style="display: none;">
                     <p>👆 Click above to mark attendance on MyMusicStaff</p>
+                </div>
+
+                <div id="mmsTestPanel" class="mms-test-panel" style="display: none;">
+                    <div class="mms-test-copy">
+                        <strong>Test mode: Test Studenty only</strong>
+                        <span>Use this flow to finish the lesson notes from this screen.</span>
+                    </div>
+                    <div class="mms-test-checklist">
+                        <span>Next steps:</span>
+                        <ul>
+                            <li>Edit the notes above until they are ready</li>
+                            <li>Tick the lesson date once it is correct</li>
+                            <li>Click the final button to save, mark present, and email the notes</li>
+                        </ul>
+                    </div>
+                    <div class="mms-test-actions">
+                        <button id="mmsExecuteBtn" class="btn btn-success btn-large" type="button" disabled>Save notes, mark present & email parent</button>
+                    </div>
+                    <div id="mmsPreview" class="mms-test-preview" style="display: none;"></div>
                 </div>
 
                 <!-- Secondary Actions -->

@@ -4,18 +4,22 @@ import test from 'node:test';
 import {
   buildPracticeNoteId,
   buildPracticeNoteSnapshot,
+  executePracticeNoteMmsTestWrite,
   getPracticeChatContext,
+  isLocalMmsWriteTestAvailable,
+  previewPracticeNoteMmsTestWrite,
   savePracticeNoteSnapshot,
   splitStructuredNoteText,
 } from '../public/src/practice-note-sync.js';
 
 test('getPracticeChatContext reads dashboard handoff query params', () => {
-  const context = getPracticeChatContext('?studentId=sdt_123&studentName=Ada%20Lovelace&tutor=Dean&dashboardBaseUrl=https%3A%2F%2Fexample.com%2F');
+  const context = getPracticeChatContext('?studentId=sdt_123&studentName=Ada%20Lovelace&tutor=Dean&dashboardBaseUrl=https%3A%2F%2Fexample.com%2F&practiceChatSecret=secret-token');
 
   assert.deepEqual(context, {
     studentId: 'sdt_123',
     studentName: 'Ada Lovelace',
     tutor: 'Dean',
+    practiceChatSecret: 'secret-token',
     dashboardBaseUrl: 'https://example.com',
   });
 });
@@ -119,13 +123,14 @@ test('savePracticeNoteSnapshot posts to dashboard API and reports failures', asy
 
   const result = await savePracticeNoteSnapshot({
     dashboardBaseUrl: 'https://dashboard.example',
-    snapshot: { studentMmsId: 'sdt_abc', rawNoteText: 'Lesson note' },
+    snapshot: { studentMmsId: 'sdt_abc', rawNoteText: 'Lesson note', practiceChatSecret: 'secret-token' },
     fetchImpl,
   });
 
   assert.equal(result.noteId, 'practice_note:sdt_abc:123');
   assert.equal(requests[0].url, 'https://dashboard.example/api/practice-notes');
   assert.equal(requests[0].options.method, 'POST');
+  assert.equal(requests[0].options.headers['X-FirstChord-PracticeChat-Secret'], 'secret-token');
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     studentMmsId: 'sdt_abc',
     rawNoteText: 'Lesson note',
@@ -143,4 +148,90 @@ test('savePracticeNoteSnapshot posts to dashboard API and reports failures', asy
     }),
     /note text is required/u,
   );
+});
+
+test('isLocalMmsWriteTestAvailable allows Level 2 pilot tutors and Test Studenty', () => {
+  assert.equal(isLocalMmsWriteTestAvailable({
+    context: {
+      studentId: 'sdt_real',
+      tutor: 'Finn',
+      dashboardBaseUrl: 'http://localhost:3000',
+    },
+    hostname: 'localhost',
+  }), true);
+
+  assert.equal(isLocalMmsWriteTestAvailable({
+    context: {
+      studentId: 'sdt_real',
+      tutor: 'Dean',
+      dashboardBaseUrl: 'http://localhost:3000',
+    },
+    hostname: 'localhost',
+  }), false);
+
+  assert.equal(isLocalMmsWriteTestAvailable({
+    context: {
+      studentId: 'sdt_fBg9JN',
+      tutor: 'Dean',
+      dashboardBaseUrl: 'https://efficient-sparkle-production.up.railway.app',
+    },
+    hostname: 'practice-chat-pwa.web.app',
+  }), true);
+});
+
+test('previewPracticeNoteMmsTestWrite posts a dry-run request', async () => {
+  const requests = [];
+  const result = await previewPracticeNoteMmsTestWrite({
+    dashboardBaseUrl: 'http://localhost:3000',
+    studentId: 'sdt_fBg9JN',
+    noteText: 'Test note',
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        json: async () => ({ success: true, mode: 'dry_run' }),
+      };
+    },
+  });
+
+  assert.equal(result.mode, 'dry_run');
+  assert.equal(requests[0].url, 'http://localhost:3000/api/practice-notes/mms-test');
+  assert.equal(JSON.parse(requests[0].options.body).mode, 'dry_run');
+});
+
+test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async () => {
+  const requests = [];
+  await executePracticeNoteMmsTestWrite({
+    dashboardBaseUrl: 'http://localhost:3000',
+    studentId: 'sdt_fBg9JN',
+    noteText: 'Test note',
+    targetAttendanceId: 'atn_test',
+    noteSnapshot: {
+      noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
+      studentMmsId: 'sdt_fBg9JN',
+      rawNoteText: 'Test note',
+    },
+    practiceChatSecret: 'secret-token',
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        json: async () => ({ success: true, mode: 'execute' }),
+      };
+    },
+  });
+
+  assert.equal(requests[0].options.headers['X-FirstChord-PracticeChat-Secret'], 'secret-token');
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    studentMmsId: 'sdt_fBg9JN',
+    noteText: 'Test note',
+    mode: 'execute',
+    targetAttendanceId: 'atn_test',
+    noteSnapshot: {
+      noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
+      studentMmsId: 'sdt_fBg9JN',
+      rawNoteText: 'Test note',
+    },
+    confirmLevel2Pilot: true,
+  });
 });
