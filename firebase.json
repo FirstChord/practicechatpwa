@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "practice-chat-pwa",
     "public": "public",
     "ignore": [
       "firebase.json",
