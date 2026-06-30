@@ -681,6 +681,52 @@ class PracticeChatApp {
         this.mmsExecuteBtn.disabled = true;
     }
 
+    confirmLessonFinish({ studentName = '', targetDate = '' } = {}) {
+        const student = studentName || this.context.studentName || 'this student';
+        const date = targetDate || 'the selected lesson';
+
+        return new Promise((resolve) => {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'action-confirm-backdrop';
+            backdrop.innerHTML = `
+                <div class="action-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finishConfirmTitle">
+                    <div class="action-confirm-kicker">Ready to finish?</div>
+                    <h2 id="finishConfirmTitle">Send ${this.escapeHtml(student)}’s practice notes</h2>
+                    <p class="action-confirm-copy">
+                        This will complete the lesson admin for ${this.escapeHtml(date)}.
+                    </p>
+                    <ul class="action-confirm-list">
+                        <li>Save the note to the dashboard</li>
+                        <li>Mark attendance Present in MMS</li>
+                        <li>Email the parent from First Chord</li>
+                    </ul>
+                    <div class="action-confirm-actions">
+                        <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Go back</button>
+                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">Finish lesson</button>
+                    </div>
+                </div>
+            `;
+
+            const cleanup = (answer) => {
+                document.removeEventListener('keydown', onKeyDown);
+                backdrop.remove();
+                resolve(answer);
+            };
+            const onKeyDown = (event) => {
+                if (event.key === 'Escape') cleanup(false);
+            };
+
+            backdrop.addEventListener('click', (event) => {
+                const action = event.target?.dataset?.confirm;
+                if (action === 'yes') cleanup(true);
+                if (action === 'cancel' || event.target === backdrop) cleanup(false);
+            });
+            document.addEventListener('keydown', onKeyDown);
+            document.body.appendChild(backdrop);
+            backdrop.querySelector('[data-confirm="yes"]')?.focus();
+        });
+    }
+
     async previewMmsTestWrite() {
         if (this.mmsTestInFlight) return;
         const noteText = this.getCurrentNoteText();
@@ -729,7 +775,11 @@ class PracticeChatApp {
         const candidates = this.lastMmsPreview?.candidateAttendances || [];
         const selectedCandidate = candidates.find((candidate) => candidate.attendanceId === targetAttendanceId) || this.lastMmsPreview?.targetAttendance || {};
         const targetDate = this.formatMmsLessonDate(selectedCandidate.eventStartDate);
-        if (!confirm(`Save these notes, mark Test Studenty present, and email the parent for ${targetDate}?`)) {
+        const confirmed = await this.confirmLessonFinish({
+            studentName: this.context.studentName,
+            targetDate
+        });
+        if (!confirmed) {
             return;
         }
 
