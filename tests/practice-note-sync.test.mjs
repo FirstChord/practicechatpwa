@@ -206,6 +206,7 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
     studentId: 'sdt_fBg9JN',
     noteText: 'Test note',
     targetAttendanceId: 'atn_test',
+    attendanceStatus: 'AbsentNoMakeup',
     noteSnapshot: {
       noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
       studentMmsId: 'sdt_fBg9JN',
@@ -227,6 +228,7 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
     noteText: 'Test note',
     mode: 'execute',
     targetAttendanceId: 'atn_test',
+    attendanceStatus: 'AbsentNoMakeup',
     noteSnapshot: {
       noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
       studentMmsId: 'sdt_fBg9JN',

@@ -37,6 +37,7 @@ class PracticeChatApp {
         this.mmsTestInFlight = false;
         this.lastMmsPreview = null;
         this.selectedMmsAttendanceId = '';
+        this.selectedMmsAttendanceStatus = 'Present';
         this.mmsDateConfirmed = false;
         this.mmsWorkflowComplete = false;
         this.mmsExecuteButtonLabel = '';
@@ -60,6 +61,7 @@ class PracticeChatApp {
         // Navigation buttons
         this.skipBtn = document.getElementById('skipBtn');
         this.backBtn = document.getElementById('backBtn');
+        this.typeNotesBtn = document.getElementById('typeNotesBtn');
 
         // Answer display
         this.currentAnswerEl = document.getElementById('currentAnswer');
@@ -73,6 +75,7 @@ class PracticeChatApp {
         this.mmsTestPanel = document.getElementById('mmsTestPanel');
         this.mmsExecuteBtn = document.getElementById('mmsExecuteBtn');
         this.mmsPreviewEl = document.getElementById('mmsPreview');
+        this.attendanceStatusInputs = document.querySelectorAll('input[name="attendanceStatus"]');
 
         // Question section
         this.questionSection = document.getElementById('questionSection');
@@ -85,6 +88,7 @@ class PracticeChatApp {
         this.mainActionBtn.addEventListener('click', () => this.handleMainAction());
         this.skipBtn.addEventListener('click', () => this.skipQuestion());
         this.backBtn.addEventListener('click', () => this.previousQuestion());
+        this.typeNotesBtn?.addEventListener('click', () => this.startTypedNotes());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.newBtn.addEventListener('click', () => this.resetForNew());
         this.processedEl.addEventListener('input', () => this.invalidateMmsPreview());
@@ -95,6 +99,9 @@ class PracticeChatApp {
         if (this.mmsPreviewEl) {
             this.mmsPreviewEl.addEventListener('change', (event) => this.handleMmsPreviewChange(event));
         }
+        this.attendanceStatusInputs.forEach((input) => {
+            input.addEventListener('change', (event) => this.handleAttendanceStatusChange(event));
+        });
     }
 
     configureMmsTestPanel() {
@@ -108,8 +115,12 @@ class PracticeChatApp {
     resetMmsTestState() {
         this.lastMmsPreview = null;
         this.selectedMmsAttendanceId = '';
+        this.selectedMmsAttendanceStatus = 'Present';
         this.mmsDateConfirmed = false;
         this.mmsWorkflowComplete = false;
+        this.attendanceStatusInputs.forEach((input) => {
+            input.checked = input.value === 'Present';
+        });
         if (this.mmsPreviewEl) {
             this.mmsPreviewEl.innerHTML = '';
             this.mmsPreviewEl.style.display = 'none';
@@ -131,6 +142,27 @@ class PracticeChatApp {
     invalidateMmsPreview() {
         if (!this.lastMmsPreview || this.mmsWorkflowComplete) return;
         this.showStatus('Notes updated. The final save will use the edited version.', 'info');
+    }
+
+    startTypedNotes() {
+        if (this.isRecording) {
+            this.showStatus('Stop the recording before switching to typed notes.', 'warning');
+            return;
+        }
+
+        this.questionAnswers = ['', '', ''];
+        this.processedEl.textContent = this.buildTypedNoteTemplate();
+        this.questionSection.style.display = 'none';
+        this.outputSection.classList.add('show');
+        this.showStatus('Type or paste the lesson notes, then check the lesson date.', 'info');
+
+        if (isLocalMmsWriteTestAvailable({ context: this.context })) {
+            this.previewMmsTestWrite();
+        }
+    }
+
+    buildTypedNoteTemplate() {
+        return QUESTION_LABELS.map((label) => `${label}\n`).join('\n').trim();
     }
 
     handleMainAction() {
@@ -507,6 +539,7 @@ class PracticeChatApp {
 
     renderMmsPreview(preview) {
         if (!this.mmsPreviewEl) return;
+        const isAbsentNoMakeup = this.selectedMmsAttendanceStatus === 'AbsentNoMakeup';
         const target = preview.targetAttendance || {};
         const candidates = preview.candidateAttendances || [];
         this.selectedMmsAttendanceId = this.selectedMmsAttendanceId || target.attendanceId || '';
@@ -541,7 +574,9 @@ class PracticeChatApp {
             </label>
             <div><strong>Why this date:</strong> ${this.escapeHtml(selectionLabel)}</div>
             <div><strong>Current MMS status:</strong> ${this.escapeHtml(selectedCandidate.attendanceStatus || 'Unknown')}</div>
-            <div><strong>Email will go to:</strong> ${this.escapeHtml(recipientNames)} · ${this.escapeHtml(recipientEmails)}</div>
+            ${isAbsentNoMakeup
+                ? '<div class="absence-note"><strong>Absent:</strong> This will mark the student AbsentNoMakeup in MMS and will not email practice notes.</div>'
+                : `<div><strong>Email will go to:</strong> ${this.escapeHtml(recipientNames)} · ${this.escapeHtml(recipientEmails)}</div>`}
             <label class="date-select-label" for="mmsAttendanceSelect">Wrong date?</label>
             <select id="mmsAttendanceSelect" class="date-select">
                 ${candidateOptions}
@@ -564,30 +599,94 @@ class PracticeChatApp {
         }
     }
 
+    handleAttendanceStatusChange(event) {
+        this.selectedMmsAttendanceStatus = event.target.value === 'AbsentNoMakeup' ? 'AbsentNoMakeup' : 'Present';
+        this.updateMmsExecuteButtonLabel();
+        if (this.lastMmsPreview && !this.mmsWorkflowComplete) {
+            this.renderMmsPreview(this.lastMmsPreview);
+        }
+    }
+
     updateMmsExecuteState() {
         if (!this.mmsExecuteBtn) return;
+        this.updateMmsExecuteButtonLabel();
         this.mmsExecuteBtn.disabled = !this.mmsDateConfirmed || !this.selectedMmsAttendanceId || this.mmsWorkflowComplete || this.mmsTestInFlight;
+    }
+
+    updateMmsExecuteButtonLabel() {
+        if (!this.mmsExecuteBtn || this.mmsTestInFlight || this.mmsWorkflowComplete) return;
+        this.mmsExecuteBtn.textContent = this.selectedMmsAttendanceStatus === 'AbsentNoMakeup'
+            ? 'Mark absent in MMS'
+            : this.mmsExecuteButtonLabel || 'Save notes, mark present & email parent';
     }
 
     setMmsExecuteButtonBusy(isBusy) {
         if (!this.mmsExecuteBtn) return;
         if (isBusy) {
+            this.mmsExecuteBtn.classList.remove('is-complete', 'is-warning');
             this.mmsExecuteBtn.classList.add('is-loading');
-            this.mmsExecuteBtn.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>Saving...';
+            this.mmsExecuteBtn.innerHTML = '<span class="button-spinner" aria-hidden="true"></span>Confirming...';
             return;
         }
-        this.mmsExecuteBtn.classList.remove('is-loading');
-        this.mmsExecuteBtn.textContent = this.mmsExecuteButtonLabel || 'Save notes, mark present & email parent';
+        this.mmsExecuteBtn.classList.remove('is-loading', 'is-complete', 'is-warning');
+        this.updateMmsExecuteButtonLabel();
+    }
+
+    setMmsExecuteButtonComplete(label = 'Lesson done ✓') {
+        if (!this.mmsExecuteBtn) return;
+        this.mmsExecuteBtn.classList.remove('is-loading', 'is-warning');
+        this.mmsExecuteBtn.classList.add('is-complete');
+        this.mmsExecuteBtn.disabled = true;
+        this.mmsExecuteBtn.innerHTML = `<span class="button-check" aria-hidden="true">✓</span>${this.escapeHtml(label)}`;
+    }
+
+    setMmsExecuteButtonWarning(label = 'Needs follow-up') {
+        if (!this.mmsExecuteBtn) return;
+        this.mmsExecuteBtn.classList.remove('is-loading', 'is-complete');
+        this.mmsExecuteBtn.classList.add('is-warning');
+        this.mmsExecuteBtn.disabled = true;
+        this.mmsExecuteBtn.textContent = label;
+    }
+
+    notifyDashboardPracticeChatComplete({ result = {}, status = 'completed' } = {}) {
+        const message = {
+            type: 'firstchord:practice-chat-complete',
+            status,
+            studentId: this.context.studentId,
+            studentName: this.context.studentName,
+            tutor: this.context.tutor,
+            noteId: result.practiceNoteLog?.noteId || result.noteId || '',
+            attendanceId: result.targetAttendance?.attendanceId || this.selectedMmsAttendanceId || ''
+        };
+
+        let targetOrigin = '*';
+        try {
+            if (this.context.dashboardBaseUrl) {
+                targetOrigin = new URL(this.context.dashboardBaseUrl).origin;
+            }
+        } catch {
+            targetOrigin = '*';
+        }
+
+        for (const target of [window.parent, window.opener]) {
+            if (!target || target === window) continue;
+            try {
+                target.postMessage(message, targetOrigin);
+            } catch (error) {
+                console.warn('Practice Chat completion message failed:', error);
+            }
+        }
     }
 
     renderMmsSavingState(targetDate = '') {
         if (!this.mmsPreviewEl) return;
+        const isAbsentNoMakeup = this.selectedMmsAttendanceStatus === 'AbsentNoMakeup';
         this.mmsPreviewEl.innerHTML = `
             <div class="saving-title">Finishing lesson admin...</div>
             <ul class="saving-list">
-                <li>Saving notes to the dashboard</li>
-                <li>Marking attendance Present in MMS for ${this.escapeHtml(targetDate || 'the selected lesson')}</li>
-                <li>Emailing the practice notes to the parent</li>
+                ${isAbsentNoMakeup
+                    ? `<li>Marking the student AbsentNoMakeup in MMS for ${this.escapeHtml(targetDate || 'the selected lesson')}</li><li>Skipping the parent practice-note email</li>`
+                    : `<li>Saving notes to the dashboard</li><li>Marking attendance Present in MMS for ${this.escapeHtml(targetDate || 'the selected lesson')}</li><li>Emailing the practice notes to the parent</li>`}
             </ul>
         `;
         this.mmsPreviewEl.style.display = 'block';
@@ -595,15 +694,16 @@ class PracticeChatApp {
 
     renderMmsCompletion(result) {
         if (!this.mmsPreviewEl) return;
+        const isAbsentNoMakeup = this.selectedMmsAttendanceStatus === 'AbsentNoMakeup'
+            || result.requestedAttendanceStatus === 'AbsentNoMakeup';
         const target = result.targetAttendance || {};
         const email = result.practiceNoteEmail || result.emailNotes || {};
         this.mmsPreviewEl.innerHTML = `
             <div class="completion-title">Done</div>
             <ul class="completion-list">
-                <li>Saved to dashboard</li>
-                <li>Saved to MMS</li>
-                <li>Attendance marked Present for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li>
-                <li>Email sent to ${this.escapeHtml(email.toEmail || 'parent')}</li>
+                ${isAbsentNoMakeup
+                    ? `<li>Attendance marked AbsentNoMakeup in MMS for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li><li>No parent practice-note email was sent</li>`
+                    : `<li>Saved to dashboard</li><li>Saved to MMS</li><li>Attendance marked Present for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li><li>Email sent to ${this.escapeHtml(email.toEmail || 'parent')}</li>`}
             </ul>
         `;
         this.mmsPreviewEl.style.display = 'block';
@@ -612,14 +712,16 @@ class PracticeChatApp {
 
     renderMmsAlreadyCompleted(result) {
         if (!this.mmsPreviewEl) return;
+        const isAbsentNoMakeup = this.selectedMmsAttendanceStatus === 'AbsentNoMakeup'
+            || result.requestedAttendanceStatus === 'AbsentNoMakeup';
         const target = result.targetAttendance || {};
         const email = result.practiceNoteEmail || result.emailNotes || {};
         this.mmsPreviewEl.innerHTML = `
             <div class="completion-title">Already done</div>
             <ul class="completion-list">
-                <li>These exact notes were already saved for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li>
-                <li>The parent email has already been sent${email.sentAt ? ` at ${this.escapeHtml(this.formatDisplayDate(email.sentAt))}` : ''}</li>
-                <li>No duplicate email was sent</li>
+                ${isAbsentNoMakeup
+                    ? `<li>This lesson was already marked AbsentNoMakeup for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li><li>No parent practice-note email was sent</li>`
+                    : `<li>These exact notes were already saved for ${this.escapeHtml(this.formatMmsLessonDate(target.eventStartDate))}</li><li>The parent email has already been sent${email.sentAt ? ` at ${this.escapeHtml(this.formatDisplayDate(email.sentAt))}` : ''}</li><li>No duplicate email was sent</li>`}
             </ul>
         `;
         this.mmsPreviewEl.style.display = 'block';
@@ -681,9 +783,10 @@ class PracticeChatApp {
         this.mmsExecuteBtn.disabled = true;
     }
 
-    confirmLessonFinish({ studentName = '', targetDate = '' } = {}) {
+    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present' } = {}) {
         const student = studentName || this.context.studentName || 'this student';
         const date = targetDate || 'the selected lesson';
+        const isAbsentNoMakeup = attendanceStatus === 'AbsentNoMakeup';
 
         return new Promise((resolve) => {
             const backdrop = document.createElement('div');
@@ -691,18 +794,18 @@ class PracticeChatApp {
             backdrop.innerHTML = `
                 <div class="action-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finishConfirmTitle">
                     <div class="action-confirm-kicker">Ready to finish?</div>
-                    <h2 id="finishConfirmTitle">Send ${this.escapeHtml(student)}’s practice notes</h2>
+                    <h2 id="finishConfirmTitle">${isAbsentNoMakeup ? `Mark ${this.escapeHtml(student)} absent` : `Send ${this.escapeHtml(student)}’s practice notes`}</h2>
                     <p class="action-confirm-copy">
                         This will complete the lesson admin for ${this.escapeHtml(date)}.
                     </p>
                     <ul class="action-confirm-list">
-                        <li>Save the note to the dashboard</li>
-                        <li>Mark attendance Present in MMS</li>
-                        <li>Email the parent from First Chord</li>
+                        ${isAbsentNoMakeup
+                            ? '<li>Mark attendance AbsentNoMakeup in MMS</li><li>Do not email practice notes</li><li>Keep this as an attendance-only record</li>'
+                            : '<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email the parent from First Chord</li>'}
                     </ul>
                     <div class="action-confirm-actions">
                         <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Go back</button>
-                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">Finish lesson</button>
+                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">${isAbsentNoMakeup ? 'Mark absent' : 'Finish lesson'}</button>
                     </div>
                 </div>
             `;
@@ -743,6 +846,7 @@ class PracticeChatApp {
                 dashboardBaseUrl: this.context.dashboardBaseUrl,
                 studentId: this.context.studentId,
                 noteText,
+                attendanceStatus: this.selectedMmsAttendanceStatus,
                 practiceChatSecret: this.context.practiceChatSecret
             });
             this.lastMmsPreview = preview;
@@ -763,6 +867,7 @@ class PracticeChatApp {
         if (this.mmsTestInFlight) return;
         const noteText = this.getCurrentNoteText();
         const targetAttendanceId = this.selectedMmsAttendanceId || '';
+        let finalButtonHandled = false;
         if (!noteText || !targetAttendanceId) {
             this.showStatus('Confirm the lesson date first', 'warning');
             return;
@@ -777,7 +882,8 @@ class PracticeChatApp {
         const targetDate = this.formatMmsLessonDate(selectedCandidate.eventStartDate);
         const confirmed = await this.confirmLessonFinish({
             studentName: this.context.studentName,
-            targetDate
+            targetDate,
+            attendanceStatus: this.selectedMmsAttendanceStatus
         });
         if (!confirmed) {
             return;
@@ -798,6 +904,7 @@ class PracticeChatApp {
                 studentId: this.context.studentId,
                 noteText,
                 targetAttendanceId,
+                attendanceStatus: this.selectedMmsAttendanceStatus,
                 noteSnapshot,
                 practiceChatSecret: this.context.practiceChatSecret
             });
@@ -810,26 +917,46 @@ class PracticeChatApp {
             } else if (result.duplicateSkipped || result.idempotency?.status === 'already_completed') {
                 this.mmsWorkflowComplete = true;
                 this.renderMmsAlreadyCompleted(result);
+                this.setMmsExecuteButtonComplete('Already done ✓');
+                finalButtonHandled = true;
+                this.notifyDashboardPracticeChatComplete({ result, status: 'already_completed' });
                 this.showStatus('Already done: no duplicate parent email was sent', 'success');
             } else if (result.emailNotes?.ok === false) {
                 this.mmsWorkflowComplete = true;
                 this.renderMmsPartialCompletion(result);
+                this.setMmsExecuteButtonWarning('Manual follow-up needed');
+                finalButtonHandled = true;
                 this.showStatus('Saved to dashboard and MMS. Email needs manual follow-up.', 'warning');
             } else if (result.practiceNoteLog?.ok === false) {
                 this.mmsWorkflowComplete = true;
                 this.renderMmsLogWarning(result);
+                this.setMmsExecuteButtonWarning('Dashboard log needs checking');
+                finalButtonHandled = true;
                 this.showStatus('Email sent and MMS updated, but the dashboard log needs checking.', 'warning');
             } else {
                 this.mmsWorkflowComplete = true;
                 this.renderMmsCompletion(result);
-                this.showStatus('Done: notes saved, attendance marked present, and parent email sent', 'success');
+                this.setMmsExecuteButtonComplete(this.selectedMmsAttendanceStatus === 'AbsentNoMakeup'
+                    ? 'Absent marked ✓'
+                    : 'Lesson done ✓');
+                finalButtonHandled = true;
+                this.notifyDashboardPracticeChatComplete({
+                    result,
+                    status: this.selectedMmsAttendanceStatus === 'AbsentNoMakeup' ? 'absent_no_makeup' : 'completed'
+                });
+                this.showStatus(this.selectedMmsAttendanceStatus === 'AbsentNoMakeup'
+                    ? 'Done: attendance marked absent in MMS'
+                    : 'Done: notes saved, attendance marked present, and parent email sent',
+                'success');
             }
         } catch (error) {
             console.error('MMS test write failed:', error);
             this.showStatus(error.message || 'MMS test write failed', 'error');
         } finally {
             this.mmsTestInFlight = false;
-            this.setMmsExecuteButtonBusy(false);
+            if (!finalButtonHandled) {
+                this.setMmsExecuteButtonBusy(false);
+            }
             this.updateMmsExecuteState();
         }
     }

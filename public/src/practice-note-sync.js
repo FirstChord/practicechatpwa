@@ -135,6 +135,7 @@ async function callPracticeNoteMmsTestRoute({
     noteText = '',
     mode = 'dry_run',
     targetAttendanceId = '',
+    attendanceStatus = 'Present',
     noteSnapshot = null,
     practiceChatSecret = '',
     fetchImpl = fetch
@@ -150,6 +151,7 @@ async function callPracticeNoteMmsTestRoute({
             noteText,
             mode,
             targetAttendanceId,
+            attendanceStatus,
             noteSnapshot,
             confirmLevel2Pilot: mode === 'execute'
         })

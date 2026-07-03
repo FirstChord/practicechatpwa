@@ -163,6 +163,10 @@ body {
     line-height: 1.5;
 }
 
+.type-notes-link {
+    opacity: 0.78;
+}
+
 /* Status Messages */
 .status {
     padding: 15px 20px;
@@ -255,6 +259,40 @@ body {
     margin: 3px 0;
 }
 
+.attendance-choice {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 12px;
+    border: 1px solid rgba(62, 141, 88, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.attendance-choice legend {
+    padding: 0 4px;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.attendance-choice label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-dark);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.attendance-choice input {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--success-color);
+}
+
 .mms-test-actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -294,6 +332,14 @@ body {
     height: 18px;
     margin-top: 1px;
     flex: 0 0 auto;
+}
+
+.absence-note {
+    border: 1px solid rgba(255, 152, 0, 0.24);
+    border-radius: 8px;
+    background: rgba(255, 152, 0, 0.1);
+    padding: 10px;
+    color: var(--text-dark);
 }
 
 .date-select-label {
@@ -520,6 +566,17 @@ body {
     cursor: wait;
 }
 
+.btn.is-complete {
+    background: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(62, 141, 88, 0.18);
+}
+
+.btn.is-warning {
+    background: var(--warning-color);
+    color: var(--text-dark);
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.16);
+}
+
 .button-spinner {
     width: 16px;
     height: 16px;
@@ -533,6 +590,17 @@ body {
     to {
         transform: rotate(360deg);
     }
+}
+
+.button-check {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 14px;
+    font-weight: 900;
 }
 
 .btn:active:not(:disabled) {

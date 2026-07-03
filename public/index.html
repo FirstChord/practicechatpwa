@@ -75,6 +75,9 @@
                     <button id="backBtn" class="btn-link" style="display: none;">
                         ← Back
                     </button>
+                    <button id="typeNotesBtn" class="btn-link type-notes-link">
+                        Type notes instead
+                    </button>
                     <button id="skipBtn" class="btn-link">
                         Skip Question →
                     </button>
@@ -112,9 +115,20 @@
                         <ul>
                             <li>Edit the notes above until they are ready</li>
                             <li>Tick the lesson date once it is correct</li>
-                            <li>Click the final button to save, mark present, and email the notes</li>
+                            <li>Click the final button to save attendance and finish the lesson admin</li>
                         </ul>
                     </div>
+                    <fieldset class="attendance-choice" aria-label="Attendance status">
+                        <legend>Attendance</legend>
+                        <label>
+                            <input type="radio" name="attendanceStatus" value="Present" checked>
+                            <span>Lesson happened</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="attendanceStatus" value="AbsentNoMakeup">
+                            <span>Student absent today</span>
+                        </label>
+                    </fieldset>
                     <div class="mms-test-actions">
                         <button id="mmsExecuteBtn" class="btn btn-success btn-large" type="button" disabled>Save notes, mark present & email parent</button>
                     </div>
