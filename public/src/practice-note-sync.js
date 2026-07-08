@@ -1,6 +1,6 @@
 const DEFAULT_SOURCE = 'practice_chat_pwa';
 export const TEST_MMS_WRITE_STUDENT_ID = 'sdt_fBg9JN';
-export const LEVEL_2_PILOT_TUTORS = ['Finn', 'Tom', 'Fennella'];
+export const LEVEL_2_PILOT_TUTORS = ['Finn', 'Tom', 'Fennella', 'Dean'];
 
 function clean(value = '') {
     return `${value || ''}`.trim();
@@ -35,6 +35,7 @@ function normalisePilotTutor(value = '') {
     if (cleaned === 'finn' || cleaned.includes('finn le marinel')) return 'Finn';
     if (cleaned === 'tom' || cleaned.includes('tom walters')) return 'Tom';
     if (cleaned === 'fennella' || cleaned.includes('fennella mccallum')) return 'Fennella';
+    if (cleaned === 'dean' || cleaned.includes('dean louden')) return 'Dean';
     return clean(value);
 }
 

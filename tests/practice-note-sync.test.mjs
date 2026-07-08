@@ -167,7 +167,16 @@ test('isLocalMmsWriteTestAvailable allows Level 2 pilot tutors and Test Studenty
       dashboardBaseUrl: 'http://localhost:3000',
     },
     hostname: 'localhost',
-  }), false);
+  }), true);
+
+  assert.equal(isLocalMmsWriteTestAvailable({
+    context: {
+      studentId: 'sdt_real',
+      tutor: 'Dean Louden',
+      dashboardBaseUrl: 'http://localhost:3000',
+    },
+    hostname: 'localhost',
+  }), true);
 
   assert.equal(isLocalMmsWriteTestAvailable({
     context: {
