@@ -3,7 +3,7 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v15';
+const CACHE_NAME = 'practice-chat-v16-dean-pilot';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
@@ -11,8 +11,8 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
-  '/src/app.js',
-  '/src/practice-note-sync.js',
+  '/src/app.js?v=20260708-dean-pilot',
+  '/src/practice-note-sync.js?v=20260708-dean-pilot',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'

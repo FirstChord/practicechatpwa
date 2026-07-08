@@ -10,7 +10,9 @@ import {
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot
-} from './practice-note-sync.js';
+} from './practice-note-sync.js?v=20260708-dean-pilot';
+
+const PRACTICE_CHAT_BUILD = '20260708-dean-pilot';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -1047,6 +1049,6 @@ class PracticeChatApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎵 Practice Chat initializing...');
+    console.log(`🎵 Practice Chat initializing... build ${PRACTICE_CHAT_BUILD}`);
     new PracticeChatApp();
 });
