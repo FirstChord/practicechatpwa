@@ -184,6 +184,21 @@ When those parameters are present, `Take Attendance` posts to:
 
 The save is best-effort. If the dashboard snapshot fails, the app warns in the console/UI but still opens MMS. This preserves the tutor workflow.
 
+### Level 2 email delivery
+
+Level 2 uses the school's trusted-tutor handoff. Before the final action, the
+PWA names the selected student and the exact parent email returned by the
+server, and requires the tutor to confirm that those notes should go to that
+parent. The selected tutor is self-attested and the server rejects missing,
+conflicting, or mismatched student tutor records before it reads MMS details or
+writes attendance/email.
+
+The dashboard handoff's shared secret is a coarse caller guard, not tutor
+identity. `Practice_Notes_Log` records the tutor as self-attested, and a
+PostgreSQL delivery claim prevents duplicate sends across dashboard instances.
+See the dashboard's `docs/admin/PRACTICE_CHAT_DELIVERY_AUDIT.md` for rollout
+and recovery steps.
+
 Rollback path: revert the dashboard `Practice_Notes_Log` commit and this PWA handoff commit. The older copy/open-MMS flow does not depend on the snapshot endpoint.
 
 ---

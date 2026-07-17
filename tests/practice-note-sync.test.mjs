@@ -150,7 +150,7 @@ test('savePracticeNoteSnapshot posts to dashboard API and reports failures', asy
   );
 });
 
-test('isLocalMmsWriteTestAvailable allows Level 2 pilot tutors and Test Studenty', () => {
+test('isLocalMmsWriteTestAvailable lets the server enforce the tutor rollout', () => {
   assert.equal(isLocalMmsWriteTestAvailable({
     context: {
       studentId: 'sdt_real',
@@ -163,7 +163,7 @@ test('isLocalMmsWriteTestAvailable allows Level 2 pilot tutors and Test Studenty
   assert.equal(isLocalMmsWriteTestAvailable({
     context: {
       studentId: 'sdt_real',
-      tutor: 'Dean',
+      tutor: 'Kenny',
       dashboardBaseUrl: 'http://localhost:3000',
     },
     hostname: 'localhost',
@@ -244,5 +244,7 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
       rawNoteText: 'Test note',
     },
     confirmLevel2Pilot: true,
+    confirmRecipient: false,
+    confirmedRecipientEmail: '',
   });
 });

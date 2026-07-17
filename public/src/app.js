@@ -10,9 +10,9 @@ import {
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot
-} from './practice-note-sync.js?v=20260708-dean-pilot';
+} from './practice-note-sync.js?v=20260717-recipient-confirm';
 
-const PRACTICE_CHAT_BUILD = '20260708-dean-pilot';
+const PRACTICE_CHAT_BUILD = '20260717-recipient-confirm';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -554,14 +554,9 @@ class PracticeChatApp {
                 return `<option value="${this.escapeHtml(candidate.attendanceId)}" ${selected}>${this.escapeHtml(label)}</option>`;
             })
             .join('');
-        const recipientEmails = (preview.recipients || [])
-            .map((recipient) => recipient.email)
-            .filter(Boolean)
-            .join(', ') || 'None';
-        const recipientNames = (preview.recipients || [])
-            .map((recipient) => recipient.name)
-            .filter(Boolean)
-            .join(', ') || 'Parent';
+        const recipient = preview.recipients?.[0] || {};
+        const recipientEmail = recipient.email || 'None';
+        const recipientName = recipient.name || 'Parent';
         const selectionLabel = selectedCandidate.attendanceId !== target.attendanceId
             ? 'You selected this lesson from the date list.'
             : preview.targetSelection?.label || 'Selected from recent lessons found for this student.';
@@ -578,7 +573,7 @@ class PracticeChatApp {
             <div><strong>Current MMS status:</strong> ${this.escapeHtml(selectedCandidate.attendanceStatus || 'Unknown')}</div>
             ${isAbsentNoMakeup
                 ? '<div class="absence-note"><strong>Absent:</strong> This will mark the student AbsentNoMakeup in MMS and will not email practice notes.</div>'
-                : `<div><strong>Email will go to:</strong> ${this.escapeHtml(recipientNames)} · ${this.escapeHtml(recipientEmails)}</div>`}
+                : `<div><strong>Email will go to:</strong> ${this.escapeHtml(recipientName)} · ${this.escapeHtml(recipientEmail)}</div>`}
             <label class="date-select-label" for="mmsAttendanceSelect">Wrong date?</label>
             <select id="mmsAttendanceSelect" class="date-select">
                 ${candidateOptions}
@@ -785,7 +780,7 @@ class PracticeChatApp {
         this.mmsExecuteBtn.disabled = true;
     }
 
-    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present' } = {}) {
+    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present', recipientName = '', recipientEmail = '' } = {}) {
         const student = studentName || this.context.studentName || 'this student';
         const date = targetDate || 'the selected lesson';
         const isAbsentNoMakeup = attendanceStatus === 'AbsentNoMakeup';
@@ -803,11 +798,12 @@ class PracticeChatApp {
                     <ul class="action-confirm-list">
                         ${isAbsentNoMakeup
                             ? '<li>Mark attendance AbsentNoMakeup in MMS</li><li>Do not email practice notes</li><li>Keep this as an attendance-only record</li>'
-                            : '<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email the parent from First Chord</li>'}
+                            : `<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email these notes to ${this.escapeHtml(recipientName || 'the selected parent')} (${this.escapeHtml(recipientEmail || 'no email found')})</li>`}
                     </ul>
+                    ${isAbsentNoMakeup ? '' : `<label class="date-confirmation action-confirm-check"><input id="sendRecipientConfirm" type="checkbox"><span>I confirm these are ${this.escapeHtml(student)}’s notes and they should be emailed to this parent.</span></label>`}
                     <div class="action-confirm-actions">
                         <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Go back</button>
-                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">${isAbsentNoMakeup ? 'Mark absent' : 'Finish lesson'}</button>
+                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes" ${isAbsentNoMakeup ? '' : 'disabled'}>${isAbsentNoMakeup ? 'Mark absent' : 'Finish lesson'}</button>
                     </div>
                 </div>
             `;
@@ -823,8 +819,12 @@ class PracticeChatApp {
 
             backdrop.addEventListener('click', (event) => {
                 const action = event.target?.dataset?.confirm;
-                if (action === 'yes') cleanup(true);
+                if (action === 'yes' && !event.target.disabled) cleanup(true);
                 if (action === 'cancel' || event.target === backdrop) cleanup(false);
+            });
+            backdrop.querySelector('#sendRecipientConfirm')?.addEventListener('change', (event) => {
+                const confirmButton = backdrop.querySelector('[data-confirm="yes"]');
+                if (confirmButton) confirmButton.disabled = !event.target.checked;
             });
             document.addEventListener('keydown', onKeyDown);
             document.body.appendChild(backdrop);
@@ -885,7 +885,9 @@ class PracticeChatApp {
         const confirmed = await this.confirmLessonFinish({
             studentName: this.context.studentName,
             targetDate,
-            attendanceStatus: this.selectedMmsAttendanceStatus
+            attendanceStatus: this.selectedMmsAttendanceStatus,
+            recipientName: this.lastMmsPreview?.recipients?.[0]?.name || '',
+            recipientEmail: this.lastMmsPreview?.recipients?.[0]?.email || '',
         });
         if (!confirmed) {
             return;
@@ -908,6 +910,7 @@ class PracticeChatApp {
                 targetAttendanceId,
                 attendanceStatus: this.selectedMmsAttendanceStatus,
                 noteSnapshot,
+                confirmedRecipientEmail: this.lastMmsPreview?.recipients?.[0]?.email || '',
                 practiceChatSecret: this.context.practiceChatSecret
             });
             this.lastMmsPreview = result;

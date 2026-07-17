@@ -1,6 +1,5 @@
 const DEFAULT_SOURCE = 'practice_chat_pwa';
 export const TEST_MMS_WRITE_STUDENT_ID = 'sdt_fBg9JN';
-export const LEVEL_2_PILOT_TUTORS = ['Finn', 'Tom', 'Fennella', 'Dean'];
 
 function clean(value = '') {
     return `${value || ''}`.trim();
@@ -27,16 +26,6 @@ export function getPracticeChatContext(search = '') {
         practiceChatSecret: clean(params.get('practiceChatSecret')),
         dashboardBaseUrl: clean(params.get('dashboardBaseUrl')).replace(/\/+$/u, '')
     };
-}
-
-function normalisePilotTutor(value = '') {
-    const cleaned = clean(value).toLowerCase();
-    if (!cleaned) return '';
-    if (cleaned === 'finn' || cleaned.includes('finn le marinel')) return 'Finn';
-    if (cleaned === 'tom' || cleaned.includes('tom walters')) return 'Tom';
-    if (cleaned === 'fennella' || cleaned.includes('fennella mccallum')) return 'Fennella';
-    if (cleaned === 'dean' || cleaned.includes('dean louden')) return 'Dean';
-    return clean(value);
 }
 
 export function splitStructuredNoteText(text = '') {
@@ -119,15 +108,14 @@ export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot
 
 export function isLocalMmsWriteTestAvailable({ context = {}, hostname = window.location.hostname } = {}) {
     const dashboardBaseUrl = clean(context.dashboardBaseUrl);
-    const tutor = normalisePilotTutor(context.tutor);
-    const isPilotTutor = LEVEL_2_PILOT_TUTORS.includes(tutor);
-    const isTestStudent = context.studentId === TEST_MMS_WRITE_STUDENT_ID;
     const isAllowedHost = Boolean(hostname) && (
         hostname === 'localhost'
         || hostname === '127.0.0.1'
         || hostname === 'practice-chat-pwa.web.app'
     );
-    return Boolean(context.studentId && dashboardBaseUrl && isAllowedHost && (isPilotTutor || isTestStudent));
+    // The server decides which tutors are enabled. Do not duplicate a rollout
+    // allow-list in this public app.
+    return Boolean(context.studentId && context.tutor && dashboardBaseUrl && isAllowedHost);
 }
 
 async function callPracticeNoteMmsTestRoute({
@@ -138,6 +126,7 @@ async function callPracticeNoteMmsTestRoute({
     targetAttendanceId = '',
     attendanceStatus = 'Present',
     noteSnapshot = null,
+    confirmedRecipientEmail = '',
     practiceChatSecret = '',
     fetchImpl = fetch
 } = {}) {
@@ -154,7 +143,9 @@ async function callPracticeNoteMmsTestRoute({
             targetAttendanceId,
             attendanceStatus,
             noteSnapshot,
-            confirmLevel2Pilot: mode === 'execute'
+            confirmLevel2Pilot: mode === 'execute',
+            confirmRecipient: mode === 'execute' && attendanceStatus !== 'AbsentNoMakeup',
+            confirmedRecipientEmail,
         })
     });
 
