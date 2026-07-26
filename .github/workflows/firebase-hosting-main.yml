@@ -13,6 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Gates the deploy. Without this the module-integrity guards only run if
+      # someone remembers to run them locally — and the bug they exist to catch
+      # is one that passes `node --check` and looks fine in review.
+      - name: Run tests
+        run: npm test
+
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
