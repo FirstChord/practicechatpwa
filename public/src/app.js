@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260724-safe-cleanup';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260724-safe-cleanup';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260726-discreet-check';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260726-discreet-check';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -11,9 +11,9 @@ import {
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot
-} from './practice-note-sync.js?v=20260724-safe-cleanup';
+} from './practice-note-sync.js?v=20260726-discreet-check';
 
-const PRACTICE_CHAT_BUILD = '20260724-safe-cleanup';
+const PRACTICE_CHAT_BUILD = '20260726-discreet-check';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -434,12 +434,17 @@ class PracticeChatApp {
 
         // Surface a mis-hearing early, while the tutor is still on the note.
         // The hard gate is at send time; this is just so it isn't a surprise.
+        //
+        // Deliberately says nothing specific. Tutors write these up with the
+        // student sitting beside them, so the flagged word is never repeated on
+        // screen — naming it would amplify exactly what we are trying to catch.
+        // The word itself is already visible in the note, and the tutor knows
+        // what a "word to check" means; the student reading over their shoulder
+        // does not. Diagnosis goes to the console instead.
         const safety = checkNoteSafety(output);
         if (!safety.ok) {
-            this.showStatus(
-                `Check the wording before sending: "${safety.findings[0].term}" looks like a mis-hearing.`,
-                'warning'
-            );
+            console.warn('Practice Chat safety flag:', safety.findings);
+            this.showStatus('One word may need a check before sending.', 'info');
         }
 
         // Save to localStorage
@@ -452,25 +457,33 @@ class PracticeChatApp {
      * note unsendable — but sending one requires a deliberate second tap.
      */
     confirmNoteSafety(findings = []) {
-        const items = findings.map((finding) => {
-            const hint = finding.likelyMeant
-                ? ` — probably <strong>${this.escapeHtml(finding.likelyMeant)}</strong>`
-                : '';
-            return `<li>“${this.escapeHtml(finding.term)}”${hint}</li>`;
-        }).join('');
+        // The flagged word is never shown. Where we have a confident guess at
+        // what was actually said, the *safe* word is offered instead — that
+        // points the tutor at the right place in the note without putting the
+        // mis-heard one on a screen a child may be looking at. With no guess,
+        // the prompt stays generic and the tutor re-reads.
+        const suggestions = [...new Set(
+            findings.map((finding) => finding.likelyMeant).filter(Boolean)
+        )];
+        const plural = findings.length > 1;
+        const hint = suggestions.length
+            ? `It may have been meant as ${suggestions
+                .map((word) => `<strong>${this.escapeHtml(word)}</strong>`)
+                .join(' or ')}.`
+            : '';
 
         return new Promise((resolve) => {
             const backdrop = document.createElement('div');
             backdrop.className = 'action-confirm-backdrop';
             backdrop.innerHTML = `
                 <div class="action-confirm-card" role="dialog" aria-modal="true" aria-labelledby="safetyConfirmTitle">
-                    <div class="action-confirm-kicker">Worth a second look</div>
-                    <h2 id="safetyConfirmTitle">This note has wording a parent might not expect</h2>
+                    <div class="action-confirm-kicker">Quick check</div>
+                    <h2 id="safetyConfirmTitle">${plural ? 'A couple of words' : 'One word'} may have been misheard</h2>
                     <p class="action-confirm-copy">
-                        Speech recognition sometimes mis-hears music words. Nothing has been
-                        changed for you — edit the note if it is wrong.
+                        Speech recognition sometimes mishears music words. ${hint}
+                        Nothing has been changed for you — read the note through and
+                        edit it if it is wrong.
                     </p>
-                    <ul class="action-confirm-list">${items}</ul>
                     <div class="action-confirm-actions">
                         <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Let me fix it</button>
                         <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">Wording is correct</button>
@@ -515,10 +528,8 @@ class PracticeChatApp {
             await navigator.clipboard.writeText(text);
             const snapshot = await this.saveDashboardSnapshotForCurrentNote();
             if (!safety.ok) {
-                this.showStatus(
-                    `Copied — but check "${safety.findings[0].term}" before pasting. It looks like a mis-hearing.`,
-                    'warning'
-                );
+                console.warn('Practice Chat safety flag:', safety.findings);
+                this.showStatus('Copied — one word may need a check before pasting.', 'info');
             } else {
                 this.showStatus(snapshot
                     ? '✅ Copied and saved to dashboard'
