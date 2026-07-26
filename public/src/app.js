@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260726-discreet-check';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260726-discreet-check';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260727-model-trial';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260727-model-trial';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -11,9 +11,9 @@ import {
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot
-} from './practice-note-sync.js?v=20260726-discreet-check';
+} from './practice-note-sync.js?v=20260727-model-trial';
 
-const PRACTICE_CHAT_BUILD = '20260726-discreet-check';
+const PRACTICE_CHAT_BUILD = '20260727-model-trial';
 
 const QUESTIONS = [
     "What did we do in the lesson?",

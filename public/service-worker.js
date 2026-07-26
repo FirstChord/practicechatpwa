@@ -3,7 +3,7 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v19-discreet-check';
+const CACHE_NAME = 'practice-chat-v20-model-trial';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install

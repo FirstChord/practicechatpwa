@@ -3,27 +3,42 @@
 
 const RELAY_SERVER = 'https://enhanced-music-lesson-notes-production.up.railway.app';
 
-// The transcription model, in one place so the value logged alongside a
-// transcript is always the model that actually produced it.
+// The transcription model, in one place so the value is always the model that
+// actually produced the text.
 //
-// Default stays whisper-1 until a side-by-side trial says otherwise. Append
-// ?asrModel=gpt-4o-transcribe to the Practice Chat URL to run a lesson on the
-// newer model; the choice is recorded per transcript in Practice_Chat_Transcripts,
-// so the comparison is a query rather than a guess.
+// Default stays whisper-1 until a trial says otherwise. The dashboard appends
+// ?asrModel=… when NEXT_PUBLIC_PRACTICE_CHAT_ASR_MODEL is set on Railway, so a
+// trial is a config change for the whole school rather than something a tutor
+// has to remember mid-lesson.
 export const DEFAULT_ASR_MODEL = 'whisper-1';
 
-// Models this app knows how to call. gpt-4o-transcribe-diarize is deliberately
-// absent: it needs response_format=diarized_json and a chunking_strategy, and it
-// does not accept a prompt at all — so it is a different feature (named
-// dialogue), not a drop-in swap.
+// Models this app knows how to call. An allow-list, not a pass-through: the
+// value arrives in a URL, so anything unrecognised must fall back rather than
+// be forwarded to OpenAI as-is.
+//
+// gpt-4o-transcribe-diarize is deliberately absent. It needs
+// response_format=diarized_json and a chunking_strategy, and accepts no prompt
+// at all — a different feature (named dialogue), not a drop-in swap.
+//
+// gpt-4o-mini-transcribe-2025-12-15 is the pinned December snapshot: OpenAI
+// reports ~90% fewer hallucinations than Whisper v2 and ~70% fewer than earlier
+// gpt-4o-transcribe models, optimised for short utterances and noisy
+// backgrounds — which is Practice Chat exactly. Pinned rather than using the
+// bare alias so a lesson's transcription cannot change under us mid-trial.
 const SUPPORTED_ASR_MODELS = new Set([
   'whisper-1',
   'gpt-4o-transcribe',
   'gpt-4o-mini-transcribe',
+  'gpt-4o-mini-transcribe-2025-12-15',
 ]);
 
 export function resolveAsrModel(search = '') {
     const requested = `${new URLSearchParams(search || '').get('asrModel') || ''}`.trim();
+    if (requested && !SUPPORTED_ASR_MODELS.has(requested)) {
+        // A typo in the Railway variable would otherwise mean "the trial quietly
+        // never happened" — the worst failure mode for a trial.
+        console.warn(`Unknown asrModel "${requested}" — falling back to ${DEFAULT_ASR_MODEL}`);
+    }
     return SUPPORTED_ASR_MODELS.has(requested) ? requested : DEFAULT_ASR_MODEL;
 }
 
