@@ -3,6 +3,30 @@
 
 const RELAY_SERVER = 'https://enhanced-music-lesson-notes-production.up.railway.app';
 
+// The transcription model, in one place so the value logged alongside a
+// transcript is always the model that actually produced it.
+//
+// Default stays whisper-1 until a side-by-side trial says otherwise. Append
+// ?asrModel=gpt-4o-transcribe to the Practice Chat URL to run a lesson on the
+// newer model; the choice is recorded per transcript in Practice_Chat_Transcripts,
+// so the comparison is a query rather than a guess.
+export const DEFAULT_ASR_MODEL = 'whisper-1';
+
+// Models this app knows how to call. gpt-4o-transcribe-diarize is deliberately
+// absent: it needs response_format=diarized_json and a chunking_strategy, and it
+// does not accept a prompt at all — so it is a different feature (named
+// dialogue), not a drop-in swap.
+const SUPPORTED_ASR_MODELS = new Set([
+  'whisper-1',
+  'gpt-4o-transcribe',
+  'gpt-4o-mini-transcribe',
+]);
+
+export function resolveAsrModel(search = '') {
+    const requested = `${new URLSearchParams(search || '').get('asrModel') || ''}`.trim();
+    return SUPPORTED_ASR_MODELS.has(requested) ? requested : DEFAULT_ASR_MODEL;
+}
+
 // Fun processing messages while transcribing
 const PROCESSING_MESSAGES = [
     "🐺 A pack of wolves are raising your notes...",
@@ -27,11 +51,14 @@ function getRandomProcessingMessage() {
  * Whisper ASR Client - Records audio and sends to Whisper API for transcription
  */
 export class WhisperASRClient {
-    constructor() {
+    constructor({ model = DEFAULT_ASR_MODEL, prompt = '' } = {}) {
         this.mediaStream = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.isRecording = false;
+        this.model = model;
+        // Tells the model which songs and terms to expect. Empty is fine.
+        this.prompt = prompt;
 
         // Callbacks
         this.onPartialTranscript = null;
@@ -151,8 +178,11 @@ export class WhisperASRClient {
             // Prepare form data
             const formData = new FormData();
             formData.append('file', audioBlob, 'audio.webm');
-            formData.append('model', 'whisper-1');
+            formData.append('model', this.model);
             formData.append('response_format', 'json');
+            if (this.prompt) {
+                formData.append('prompt', this.prompt);
+            }
 
             // Send to Whisper API
             const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {

@@ -1,18 +1,19 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { WhisperASRClient } from './asr-client.js';
-import { enhancedCleanupSpeechText } from './text-processor.js';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260724-safe-cleanup';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260724-safe-cleanup';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
+    fetchPracticeChatMusicContext,
     getPracticeChatContext,
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot
-} from './practice-note-sync.js?v=20260717-recipient-confirm';
+} from './practice-note-sync.js?v=20260724-safe-cleanup';
 
-const PRACTICE_CHAT_BUILD = '20260717-recipient-confirm';
+const PRACTICE_CHAT_BUILD = '20260724-safe-cleanup';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -34,6 +35,10 @@ class PracticeChatApp {
         this.questionAnswers = ['', '', '']; // Store answers for each question
         this.currentTranscript = '';
         this.context = getPracticeChatContext(window.location.search);
+        this.asrModel = resolveAsrModel(window.location.search);
+        // Songs and instrument for this student, used to tell the model what
+        // words to expect. Loaded once per session, in the background.
+        this.transcriptionPrompt = '';
         this.lastDashboardSavedText = '';
         this.dashboardSaveInFlight = false;
         this.mmsTestInFlight = false;
@@ -48,6 +53,28 @@ class PracticeChatApp {
         this.bindEvents();
         this.updateQuestionDisplay();
         this.configureMmsTestPanel();
+        this.loadTranscriptionPrompt();
+    }
+
+    /**
+     * Load the student's songs and instrument in the background.
+     *
+     * Silent on failure: no prompt is a slightly worse transcription, not a
+     * broken lesson, and there is nothing a tutor could do about it mid-session.
+     */
+    loadTranscriptionPrompt() {
+        fetchPracticeChatMusicContext({
+            dashboardBaseUrl: this.context.dashboardBaseUrl,
+            studentId: this.context.studentId,
+            practiceChatSecret: this.context.practiceChatSecret
+        }).then((context) => {
+            this.transcriptionPrompt = context.prompt || '';
+            if (context.songTitles?.length) {
+                console.log(`🎵 Transcription context: ${context.instrument || 'unknown instrument'}, ${context.songTitles.length} song(s)`);
+            }
+        }).catch((error) => {
+            console.warn('Music context unavailable; transcribing without a prompt:', error);
+        });
     }
 
     initializeElements() {
@@ -252,7 +279,10 @@ class PracticeChatApp {
             this.showStatus('Starting recording...', 'info');
 
             // Create new Whisper ASR client
-            this.asrClient = new WhisperASRClient();
+            this.asrClient = new WhisperASRClient({
+                model: this.asrModel,
+                prompt: this.transcriptionPrompt
+            });
 
             // Set up callbacks
             this.asrClient.onPartialTranscript = (text) => {
@@ -402,8 +432,70 @@ class PracticeChatApp {
 
         this.processedEl.textContent = output.trim();
 
+        // Surface a mis-hearing early, while the tutor is still on the note.
+        // The hard gate is at send time; this is just so it isn't a surprise.
+        const safety = checkNoteSafety(output);
+        if (!safety.ok) {
+            this.showStatus(
+                `Check the wording before sending: "${safety.findings[0].term}" looks like a mis-hearing.`,
+                'warning'
+            );
+        }
+
         // Save to localStorage
         this.saveNotes(output.trim());
+    }
+
+    /**
+     * Ask the tutor to acknowledge flagged wording before it goes to a parent.
+     * Flags never block outright — a false positive must not make a legitimate
+     * note unsendable — but sending one requires a deliberate second tap.
+     */
+    confirmNoteSafety(findings = []) {
+        const items = findings.map((finding) => {
+            const hint = finding.likelyMeant
+                ? ` — probably <strong>${this.escapeHtml(finding.likelyMeant)}</strong>`
+                : '';
+            return `<li>“${this.escapeHtml(finding.term)}”${hint}</li>`;
+        }).join('');
+
+        return new Promise((resolve) => {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'action-confirm-backdrop';
+            backdrop.innerHTML = `
+                <div class="action-confirm-card" role="dialog" aria-modal="true" aria-labelledby="safetyConfirmTitle">
+                    <div class="action-confirm-kicker">Worth a second look</div>
+                    <h2 id="safetyConfirmTitle">This note has wording a parent might not expect</h2>
+                    <p class="action-confirm-copy">
+                        Speech recognition sometimes mis-hears music words. Nothing has been
+                        changed for you — edit the note if it is wrong.
+                    </p>
+                    <ul class="action-confirm-list">${items}</ul>
+                    <div class="action-confirm-actions">
+                        <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Let me fix it</button>
+                        <button type="button" class="btn btn-success action-confirm-primary" data-confirm="yes">Wording is correct</button>
+                    </div>
+                </div>
+            `;
+
+            const cleanup = (answer) => {
+                document.removeEventListener('keydown', onKeyDown);
+                backdrop.remove();
+                resolve(answer);
+            };
+            const onKeyDown = (event) => {
+                if (event.key === 'Escape') cleanup(false);
+            };
+
+            backdrop.addEventListener('click', (event) => {
+                const action = event.target?.dataset?.confirm;
+                if (action === 'yes') cleanup(true);
+                if (action === 'cancel' || event.target === backdrop) cleanup(false);
+            });
+            document.addEventListener('keydown', onKeyDown);
+            document.body.appendChild(backdrop);
+            backdrop.querySelector('[data-confirm="cancel"]')?.focus();
+        });
     }
 
 
@@ -415,13 +507,24 @@ class PracticeChatApp {
             return;
         }
 
+        // The legacy path pastes into MMS by hand, so this warns rather than
+        // gating — the tutor still sees the note before anything is sent.
+        const safety = checkNoteSafety(text);
+
         try {
             await navigator.clipboard.writeText(text);
             const snapshot = await this.saveDashboardSnapshotForCurrentNote();
-            this.showStatus(snapshot
-                ? '✅ Copied and saved to dashboard'
-                : '✅ Copied to clipboard!',
-            'success');
+            if (!safety.ok) {
+                this.showStatus(
+                    `Copied — but check "${safety.findings[0].term}" before pasting. It looks like a mis-hearing.`,
+                    'warning'
+                );
+            } else {
+                this.showStatus(snapshot
+                    ? '✅ Copied and saved to dashboard'
+                    : '✅ Copied to clipboard!',
+                'success');
+            }
 
             if (!isLocalMmsWriteTestAvailable({ context: this.context })) {
                 // Legacy/fallback flow for normal use outside the local Test Studenty pilot.
@@ -877,6 +980,17 @@ class PracticeChatApp {
         if (!this.mmsDateConfirmed) {
             this.showStatus('Tick the lesson date before saving', 'warning');
             return;
+        }
+
+        // Runs on the note as it stands now, including any tutor edits, and
+        // before the send confirmation so wording gets fixed first.
+        const safety = checkNoteSafety(noteText);
+        if (!safety.ok) {
+            const acknowledged = await this.confirmNoteSafety(safety.findings);
+            if (!acknowledged) {
+                this.showStatus('Edit the note, then finish the lesson.', 'info');
+                return;
+            }
         }
 
         const candidates = this.lastMmsPreview?.candidateAttendances || [];

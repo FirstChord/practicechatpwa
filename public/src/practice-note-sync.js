@@ -83,6 +83,41 @@ export function buildPracticeNoteSnapshot({ context = {}, noteText = '', now = n
     };
 }
 
+/**
+ * Fetch the student's instrument and current songs, for use as a transcription
+ * prompt. Best-effort: on any failure we transcribe with no prompt, which is
+ * exactly the behaviour before this existed.
+ */
+export async function fetchPracticeChatMusicContext({
+    dashboardBaseUrl = '',
+    studentId = '',
+    practiceChatSecret = '',
+    fetchImpl = fetch
+} = {}) {
+    if (!dashboardBaseUrl || !studentId) {
+        return { prompt: '', songTitles: [], instrument: '' };
+    }
+
+    const url = `${dashboardBaseUrl}/api/practice-notes/music-context?studentId=${encodeURIComponent(studentId)}`;
+    const response = await fetchImpl(url, {
+        method: 'GET',
+        headers: {
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        }
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || `Music context lookup failed (${response.status})`);
+    }
+
+    return {
+        prompt: payload.prompt || '',
+        songTitles: payload.songTitles || [],
+        instrument: payload.instrument || ''
+    };
+}
+
 export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot = {}, fetchImpl = fetch } = {}) {
     if (!dashboardBaseUrl || !snapshot) {
         return { skipped: true };
