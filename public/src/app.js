@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260727-model-trial';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260727-model-trial';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260804-song-suggestions';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260804-song-suggestions';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -10,10 +10,11 @@ import {
     getPracticeChatContext,
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
-    savePracticeNoteSnapshot
-} from './practice-note-sync.js?v=20260727-model-trial';
+    savePracticeNoteSnapshot,
+    suggestPracticeNoteSongs
+} from './practice-note-sync.js?v=20260804-song-suggestions';
 
-const PRACTICE_CHAT_BUILD = '20260727-model-trial';
+const PRACTICE_CHAT_BUILD = '20260804-song-suggestions';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -39,6 +40,12 @@ class PracticeChatApp {
         // Songs and instrument for this student, used to tell the model what
         // words to expect. Loaded once per session, in the background.
         this.transcriptionPrompt = '';
+        this.availableSongs = [];
+        this.catalogueSongs = [];
+        this.suggestedSongs = [];
+        this.selectedSongIds = new Set();
+        this.unlistedSongTitles = [];
+        this.songSelectionLocked = false;
         this.lastDashboardSavedText = '';
         this.dashboardSaveInFlight = false;
         this.mmsTestInFlight = false;
@@ -69,6 +76,10 @@ class PracticeChatApp {
             practiceChatSecret: this.context.practiceChatSecret
         }).then((context) => {
             this.transcriptionPrompt = context.prompt || '';
+            this.availableSongs = context.songs || [];
+            this.catalogueSongs = context.catalogueSongs || [];
+            this.refreshSongSuggestions();
+            this.renderSongChoices();
             if (context.songTitles?.length) {
                 console.log(`🎵 Transcription context: ${context.instrument || 'unknown instrument'}, ${context.songTitles.length} song(s)`);
             }
@@ -101,6 +112,17 @@ class PracticeChatApp {
         this.statusEl = document.getElementById('status');
         this.processedEl = document.getElementById('processed');
         this.outputSection = document.getElementById('outputSection');
+        this.songLinkPanel = document.getElementById('songLinkPanel');
+        this.songSuggestionSection = document.getElementById('songSuggestionSection');
+        this.songSuggestionsEl = document.getElementById('songSuggestions');
+        this.songShelfSection = document.getElementById('songShelfSection');
+        this.songChoicesEl = document.getElementById('songChoices');
+        this.songSearchInput = document.getElementById('songSearchInput');
+        this.songSearchResultsEl = document.getElementById('songSearchResults');
+        this.songMoreSummary = document.getElementById('songMoreSummary');
+        this.unlistedSongInput = document.getElementById('unlistedSongInput');
+        this.addUnlistedSongBtn = document.getElementById('addUnlistedSongBtn');
+        this.unlistedSongChoicesEl = document.getElementById('unlistedSongChoices');
         this.mmsTestPanel = document.getElementById('mmsTestPanel');
         this.mmsExecuteBtn = document.getElementById('mmsExecuteBtn');
         this.mmsPreviewEl = document.getElementById('mmsPreview');
@@ -120,7 +142,39 @@ class PracticeChatApp {
         this.typeNotesBtn?.addEventListener('click', () => this.startTypedNotes());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.newBtn.addEventListener('click', () => this.resetForNew());
-        this.processedEl.addEventListener('input', () => this.invalidateMmsPreview());
+        this.processedEl.addEventListener('input', () => {
+            this.invalidateMmsPreview();
+            this.refreshSongSuggestions();
+        });
+        this.songLinkPanel?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-song-id]');
+            if (button && !this.songSelectionLocked) {
+                const songId = button.dataset.songId;
+                if (this.selectedSongIds.has(songId)) this.selectedSongIds.delete(songId);
+                else if (this.selectedSongIds.size >= 12) {
+                    this.showStatus('Select no more than twelve songs for one note.', 'warning');
+                    return;
+                } else this.selectedSongIds.add(songId);
+                this.renderSongChoices();
+                this.invalidateMmsPreview();
+                return;
+            }
+            const removeButton = event.target.closest('[data-remove-unlisted]');
+            if (removeButton && !this.songSelectionLocked) {
+                this.unlistedSongTitles = this.unlistedSongTitles
+                    .filter((title) => title !== removeButton.dataset.removeUnlisted);
+                this.renderSongChoices();
+                this.invalidateMmsPreview();
+            }
+        });
+        this.songSearchInput?.addEventListener('input', () => this.renderSongSearchResults());
+        this.addUnlistedSongBtn?.addEventListener('click', () => this.addUnlistedSong());
+        this.unlistedSongInput?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.addUnlistedSong();
+            }
+        });
         if (this.mmsExecuteBtn) {
             this.mmsExecuteButtonLabel = this.mmsExecuteBtn.textContent;
             this.mmsExecuteBtn.addEventListener('click', () => this.executeMmsTestWrite());
@@ -139,6 +193,108 @@ class PracticeChatApp {
             this.mmsTestPanel.style.display = 'block';
             this.copyBtn.style.display = 'none';
         }
+    }
+
+    renderSongChoices() {
+        if (!this.songLinkPanel || !this.songChoicesEl) return;
+        this.songLinkPanel.hidden = this.availableSongs.length === 0 && this.catalogueSongs.length === 0;
+        const suggestedIds = new Set(this.suggestedSongs.map((song) => song.songId));
+        const otherShelfSongs = this.availableSongs.filter((song) => !suggestedIds.has(song.songId));
+
+        if (this.songSuggestionSection && this.songSuggestionsEl) {
+            this.songSuggestionSection.hidden = this.suggestedSongs.length === 0;
+            this.songSuggestionsEl.innerHTML = this.suggestedSongs
+                .map((song) => this.songChoiceButton(song, { suggested: true }))
+                .join('');
+        }
+        if (this.songShelfSection) {
+            this.songShelfSection.hidden = otherShelfSongs.length === 0;
+        }
+        this.songChoicesEl.innerHTML = otherShelfSongs
+            .map((song) => this.songChoiceButton(song))
+            .join('');
+        if (this.unlistedSongChoicesEl) {
+            this.unlistedSongChoicesEl.innerHTML = this.unlistedSongTitles.map((title) => `
+                <span class="unlisted-song-choice">
+                    ${this.escapeHtml(title)}
+                    <button type="button" data-remove-unlisted="${this.escapeHtml(title)}" aria-label="Remove unlisted song ${this.escapeHtml(title)}"${this.songSelectionLocked ? ' disabled' : ''}>×</button>
+                </span>
+            `).join('');
+        }
+        if (this.songSearchInput) this.songSearchInput.disabled = this.songSelectionLocked;
+        if (this.unlistedSongInput) this.unlistedSongInput.disabled = this.songSelectionLocked;
+        if (this.addUnlistedSongBtn) this.addUnlistedSongBtn.disabled = this.songSelectionLocked;
+        if (this.songMoreSummary) {
+            const visibleIds = new Set([...this.suggestedSongs, ...this.availableSongs].map((song) => song.songId));
+            const extraCount = [...this.selectedSongIds].filter((songId) => !visibleIds.has(songId)).length
+                + this.unlistedSongTitles.length;
+            this.songMoreSummary.textContent = `Find another or add an unlisted song${extraCount ? ` · ${extraCount} added` : ''}`;
+        }
+        this.renderSongSearchResults();
+    }
+
+    songChoiceButton(song, { suggested = false } = {}) {
+        const selected = this.selectedSongIds.has(song.songId);
+        const detail = song.onShelf || this.availableSongs.some((entry) => entry.songId === song.songId)
+            ? 'Current shelf'
+            : song.artist || 'Catalogue';
+        return `<button type="button" class="song-choice${selected ? ' selected' : ''}${suggested ? ' suggested' : ''}" data-song-id="${this.escapeHtml(song.songId)}" aria-pressed="${selected}"${this.songSelectionLocked ? ' disabled' : ''}><span>${this.escapeHtml(song.title)}</span>${suggested ? `<small>${this.escapeHtml(detail)}</small>` : ''}</button>`;
+    }
+
+    refreshSongSuggestions() {
+        if (this.songSelectionLocked) return;
+        this.suggestedSongs = suggestPracticeNoteSongs({
+            noteText: this.processedEl?.textContent || '',
+            shelfSongs: this.availableSongs,
+            catalogueSongs: this.catalogueSongs
+        });
+        this.renderSongChoices();
+    }
+
+    renderSongSearchResults() {
+        if (!this.songSearchResultsEl) return;
+        const query = `${this.songSearchInput?.value || ''}`.trim().toLowerCase();
+        if (query.length < 2) {
+            this.songSearchResultsEl.innerHTML = '';
+            return;
+        }
+        const results = this.catalogueSongs
+            .filter((song) => `${song.title} ${song.artist || ''}`.toLowerCase().includes(query))
+            .sort((a, b) => {
+                const aTitle = a.title.toLowerCase();
+                const bTitle = b.title.toLowerCase();
+                return Number(bTitle.startsWith(query)) - Number(aTitle.startsWith(query))
+                    || a.title.localeCompare(b.title);
+            })
+            .slice(0, 8);
+        this.songSearchResultsEl.innerHTML = results.length
+            ? results.map((song) => this.songChoiceButton(song)).join('')
+            : '<p class="song-search-empty">No catalogue match. Add it as unlisted below.</p>';
+    }
+
+    addUnlistedSong() {
+        if (this.songSelectionLocked) return;
+        const title = `${this.unlistedSongInput?.value || ''}`.trim();
+        if (!title) return;
+        if (title.length > 120) {
+            this.showStatus('Keep an unlisted song title under 120 characters.', 'warning');
+            return;
+        }
+        if (this.unlistedSongTitles.length >= 6) {
+            this.showStatus('Add no more than six unlisted songs to one note.', 'warning');
+            return;
+        }
+        if (!this.unlistedSongTitles.some((entry) => entry.toLowerCase() === title.toLowerCase())) {
+            this.unlistedSongTitles.push(title);
+        }
+        this.unlistedSongInput.value = '';
+        this.renderSongChoices();
+        this.invalidateMmsPreview();
+    }
+
+    getSelectedSongIds() {
+        const validIds = new Set([...this.availableSongs, ...this.catalogueSongs].map((song) => song.songId));
+        return [...this.selectedSongIds].filter((songId) => validIds.has(songId)).slice(0, 12);
     }
 
     resetMmsTestState() {
@@ -431,6 +587,7 @@ class PracticeChatApp {
         }
 
         this.processedEl.textContent = output.trim();
+        this.refreshSongSuggestions();
 
         // Surface a mis-hearing early, while the tutor is still on the note.
         // The hard gate is at send time; this is just so it isn't a surprise.
@@ -562,7 +719,9 @@ class PracticeChatApp {
         const text = this.processedEl.textContent;
         const snapshot = buildPracticeNoteSnapshot({
             context: this.context,
-            noteText: text
+            noteText: text,
+            songIds: this.getSelectedSongIds(),
+            unlistedSongTitles: this.unlistedSongTitles
         });
         let savedSnapshot = null;
 
@@ -580,6 +739,8 @@ class PracticeChatApp {
                 if (!result.skipped || result.noteId) {
                     savedSnapshot = snapshot;
                     this.lastDashboardSavedText = snapshot.rawNoteText;
+                    this.songSelectionLocked = true;
+                    this.renderSongChoices();
                 }
                 if (result.noteId) {
                     console.log('✅ Practice note snapshot saved:', result.noteId);
@@ -963,6 +1124,8 @@ class PracticeChatApp {
                 studentId: this.context.studentId,
                 noteText,
                 attendanceStatus: this.selectedMmsAttendanceStatus,
+                songIds: this.getSelectedSongIds(),
+                unlistedSongTitles: this.unlistedSongTitles,
                 practiceChatSecret: this.context.practiceChatSecret
             });
             this.lastMmsPreview = preview;
@@ -1026,7 +1189,9 @@ class PracticeChatApp {
         try {
             const noteSnapshot = buildPracticeNoteSnapshot({
                 context: this.context,
-                noteText
+                noteText,
+                songIds: this.getSelectedSongIds(),
+                unlistedSongTitles: this.unlistedSongTitles
             });
             const result = await executePracticeNoteMmsTestWrite({
                 dashboardBaseUrl: this.context.dashboardBaseUrl,
@@ -1034,6 +1199,8 @@ class PracticeChatApp {
                 noteText,
                 targetAttendanceId,
                 attendanceStatus: this.selectedMmsAttendanceStatus,
+                songIds: this.getSelectedSongIds(),
+                unlistedSongTitles: this.unlistedSongTitles,
                 noteSnapshot,
                 confirmedRecipientEmail: this.lastMmsPreview?.recipients?.[0]?.email || '',
                 practiceChatSecret: this.context.practiceChatSecret
@@ -1097,6 +1264,11 @@ class PracticeChatApp {
         this.currentQuestionIndex = 0;
         this.questionAnswers = ['', '', ''];
         this.currentTranscript = '';
+        this.selectedSongIds.clear();
+        this.unlistedSongTitles = [];
+        this.suggestedSongs = [];
+        this.songSelectionLocked = false;
+        this.renderSongChoices();
         this.processedEl.textContent = 'Processed notes will appear here...';
         this.outputSection.classList.remove('show');
         this.questionSection.style.display = 'block';
@@ -1112,6 +1284,11 @@ class PracticeChatApp {
         this.currentQuestionIndex = 0;
         this.questionAnswers = ['', '', ''];
         this.currentTranscript = '';
+        this.selectedSongIds.clear();
+        this.unlistedSongTitles = [];
+        this.suggestedSongs = [];
+        this.songSelectionLocked = false;
+        this.renderSongChoices();
         this.processedEl.textContent = 'Processed notes will appear here...';
         this.outputSection.classList.remove('show');
         this.questionSection.style.display = 'block';

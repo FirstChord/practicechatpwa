@@ -25,6 +25,7 @@ A browser-based voice recording app for music teachers to quickly capture lesson
 - ✅ **Cloud Speech Recognition**: Real-time transcription via WebSocket
 - ✅ **Text Processing**: Removes "um", "uh", fixes grammar, music terminology
 - ✅ **Local Storage**: Automatically saves your last notes (24h)
+- ✅ **Reviewed song links**: Exact note-title matches are suggested after transcription, current-shelf songs are prioritised, and tutors can search the catalogue or record an explicitly unlisted title
 - ✅ **Copy to Clipboard**: One-click copy for pasting into emails/systems
 - ✅ **PWA**: Installable on desktop and mobile
 - ✅ **Offline Support**: Service worker caches app for offline use
@@ -155,6 +156,7 @@ Once deployed, users can install the app:
 ### Storage
 - **localStorage**: Saves last notes (clears after 24 hours)
 - **Dashboard snapshot**: When opened from a dashboard student link, clicking `Take Attendance` sends a best-effort copy to the dashboard `Practice_Notes_Log` tab before opening MMS
+- **Song links**: The dashboard supplies the student's current shelf plus public catalogue metadata. Exact, deterministic note matches are shown only as proposals; a tutor must select them before save. Ambiguous duplicate titles are suppressed, one-word titles need a song-work cue, and anything outside the catalogue stays explicitly unlisted for later review.
 - **MMS remains completion truth**: Tutors still mark attendance and send parent notes manually in MMS
 
 ---

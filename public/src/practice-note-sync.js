@@ -56,7 +56,109 @@ export function splitStructuredNoteText(text = '') {
     return sections;
 }
 
-export function buildPracticeNoteSnapshot({ context = {}, noteText = '', now = new Date() } = {}) {
+function normaliseSongIds(value = []) {
+    return [...new Set((Array.isArray(value) ? value : [])
+        .map(clean)
+        .filter(Boolean))].slice(0, 12);
+}
+
+function normaliseUnlistedSongTitles(value = []) {
+    return [...new Set((Array.isArray(value) ? value : [])
+        .map((title) => clean(title).slice(0, 120))
+        .filter(Boolean))].slice(0, 6);
+}
+
+function normaliseMatchText(value = '') {
+    return clean(value)
+        .normalize('NFKD')
+        .replace(/[’‘]/gu, "'")
+        .replace(/[^a-z0-9']+/giu, ' ')
+        .replace(/'/gu, '')
+        .replace(/\s+/gu, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function hasSongCue(noteText = '', position = -1) {
+    if (position < 0) return false;
+    const prefix = noteText.slice(Math.max(0, position - 48), position).trimEnd();
+    return /(?:worked on|work on|played|playing|practi[cs]ed|practi[cs]ing|learnt|learned|learning|song|piece|tune)(?:\s+the)?$/u.test(prefix);
+}
+
+/**
+ * Produce review candidates, never selected facts. Matching is deliberately
+ * exact after punctuation/case normalisation; duplicate catalogue titles are
+ * suppressed unless the student's shelf disambiguates the ID.
+ */
+export function suggestPracticeNoteSongs({
+    noteText = '',
+    shelfSongs = [],
+    catalogueSongs = [],
+    limit = 6
+} = {}) {
+    const sections = splitStructuredNoteText(noteText);
+    const sourceText = normaliseMatchText(sections.whatWeDid || noteText);
+    if (!sourceText) return [];
+
+    const shelfIds = new Set((Array.isArray(shelfSongs) ? shelfSongs : []).map((song) => clean(song?.songId)));
+    const byId = new Map();
+    for (const song of [...(Array.isArray(catalogueSongs) ? catalogueSongs : []), ...(Array.isArray(shelfSongs) ? shelfSongs : [])]) {
+        const songId = clean(song?.songId);
+        const title = clean(song?.title);
+        if (!songId || !title) continue;
+        byId.set(songId, { ...song, songId, title });
+    }
+
+    const byTitle = new Map();
+    for (const song of byId.values()) {
+        const matchTitle = normaliseMatchText(song.title);
+        if (!matchTitle) continue;
+        const entries = byTitle.get(matchTitle) || [];
+        entries.push(song);
+        byTitle.set(matchTitle, entries);
+    }
+
+    const suggestions = [];
+    for (const [matchTitle, entries] of byTitle) {
+        const paddedText = ` ${sourceText} `;
+        const paddedTitle = ` ${matchTitle} `;
+        const paddedPosition = paddedText.indexOf(paddedTitle);
+        if (paddedPosition < 0) continue;
+        const position = Math.max(0, paddedPosition - 1);
+        const shelfEntries = entries.filter((song) => shelfIds.has(song.songId));
+        const candidate = shelfEntries.length === 1
+            ? shelfEntries[0]
+            : entries.length === 1
+                ? entries[0]
+                : null;
+        if (!candidate) continue;
+
+        const wordCount = matchTitle.split(' ').filter(Boolean).length;
+        if (wordCount === 1 && !hasSongCue(sourceText, position)) continue;
+        const onShelf = shelfIds.has(candidate.songId);
+        suggestions.push({
+            ...candidate,
+            onShelf,
+            suggestionSource: onShelf ? 'current_shelf_exact' : 'catalogue_exact',
+            matchPosition: position
+        });
+    }
+
+    return suggestions
+        .sort((a, b) => Number(b.onShelf) - Number(a.onShelf)
+            || a.matchPosition - b.matchPosition
+            || a.title.localeCompare(b.title))
+        .slice(0, Math.max(0, limit))
+        .map(({ matchPosition, ...song }) => song);
+}
+
+export function buildPracticeNoteSnapshot({
+    context = {},
+    noteText = '',
+    songIds = [],
+    unlistedSongTitles = [],
+    now = new Date()
+} = {}) {
     const rawNoteText = clean(noteText);
     if (!context.studentId || !rawNoteText) {
         return null;
@@ -76,6 +178,8 @@ export function buildPracticeNoteSnapshot({ context = {}, noteText = '', now = n
         lessonDate,
         ...sections,
         rawNoteText,
+        songIds: normaliseSongIds(songIds),
+        unlistedSongTitles: normaliseUnlistedSongTitles(unlistedSongTitles),
         copiedToClipboard: true,
         attendanceStepOpened: true,
         source: DEFAULT_SOURCE,
@@ -95,7 +199,7 @@ export async function fetchPracticeChatMusicContext({
     fetchImpl = fetch
 } = {}) {
     if (!dashboardBaseUrl || !studentId) {
-        return { prompt: '', songTitles: [], instrument: '' };
+        return { prompt: '', songs: [], catalogueSongs: [], songTitles: [], instrument: '' };
     }
 
     const url = `${dashboardBaseUrl}/api/practice-notes/music-context?studentId=${encodeURIComponent(studentId)}`;
@@ -113,6 +217,23 @@ export async function fetchPracticeChatMusicContext({
 
     return {
         prompt: payload.prompt || '',
+        songs: Array.isArray(payload.songs) ? payload.songs
+            .map((song) => ({
+                songId: clean(song?.songId),
+                title: clean(song?.title),
+                status: clean(song?.status)
+            }))
+            .filter((song) => song.songId && song.title)
+            .slice(0, 12) : [],
+        catalogueSongs: Array.isArray(payload.catalogueSongs) ? payload.catalogueSongs
+            .map((song) => ({
+                songId: clean(song?.songId),
+                title: clean(song?.title),
+                artist: clean(song?.artist),
+                contentType: clean(song?.contentType)
+            }))
+            .filter((song) => song.songId && song.title)
+            .slice(0, 400) : [],
         songTitles: payload.songTitles || [],
         instrument: payload.instrument || ''
     };
@@ -160,6 +281,8 @@ async function callPracticeNoteMmsTestRoute({
     mode = 'dry_run',
     targetAttendanceId = '',
     attendanceStatus = 'Present',
+    songIds = [],
+    unlistedSongTitles = [],
     noteSnapshot = null,
     confirmedRecipientEmail = '',
     practiceChatSecret = '',
@@ -177,6 +300,8 @@ async function callPracticeNoteMmsTestRoute({
             mode,
             targetAttendanceId,
             attendanceStatus,
+            songIds: normaliseSongIds(songIds),
+            unlistedSongTitles: normaliseUnlistedSongTitles(unlistedSongTitles),
             noteSnapshot,
             confirmLevel2Pilot: mode === 'execute',
             confirmRecipient: mode === 'execute' && attendanceStatus !== 'AbsentNoMakeup',

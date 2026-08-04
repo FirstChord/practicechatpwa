@@ -5,11 +5,13 @@ import {
   buildPracticeNoteId,
   buildPracticeNoteSnapshot,
   executePracticeNoteMmsTestWrite,
+  fetchPracticeChatMusicContext,
   getPracticeChatContext,
   isLocalMmsWriteTestAvailable,
   previewPracticeNoteMmsTestWrite,
   savePracticeNoteSnapshot,
   splitStructuredNoteText,
+  suggestPracticeNoteSongs,
 } from '../public/src/practice-note-sync.js';
 
 test('getPracticeChatContext reads dashboard handoff query params', () => {
@@ -90,6 +92,8 @@ Song work.
 
 [Practice Goals]
 Verse twice.`,
+    songIds: ['fc_song_a', 'fc_song_a', 'fc_song_b'],
+    unlistedSongTitles: [' Tutor original ', 'Tutor original'],
     now: new Date('2026-06-11T12:00:00.000Z'),
   });
 
@@ -102,6 +106,74 @@ Verse twice.`,
   assert.equal(snapshot.practiceGoals, 'Verse twice.');
   assert.equal(snapshot.copiedToClipboard, true);
   assert.equal(snapshot.attendanceStepOpened, true);
+  assert.deepEqual(snapshot.songIds, ['fc_song_a', 'fc_song_b']);
+  assert.deepEqual(snapshot.unlistedSongTitles, ['Tutor original']);
+});
+
+test('fetchPracticeChatMusicContext preserves exact song objects for selection', async () => {
+  const context = await fetchPracticeChatMusicContext({
+    dashboardBaseUrl: 'https://dashboard.example',
+    studentId: 'sdt_abc',
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        prompt: 'Guitar: Ho Hey',
+        instrument: 'Guitar',
+        songTitles: ['Ho Hey'],
+        songs: [{ songId: 'fc_song_a', title: 'Ho Hey', status: 'working' }],
+        catalogueSongs: [
+          { songId: 'fc_song_a', title: 'Ho Hey', artist: 'The Lumineers', contentType: 'song' },
+          { songId: 'fc_song_b', title: 'Stand By Me', artist: 'Ben E. King', contentType: 'song' },
+        ],
+      }),
+    }),
+  });
+
+  assert.deepEqual(context.songs, [{ songId: 'fc_song_a', title: 'Ho Hey', status: 'working' }]);
+  assert.equal(context.catalogueSongs.length, 2);
+});
+
+test('suggestPracticeNoteSongs prioritises exact current-shelf mentions', () => {
+  const suggestions = suggestPracticeNoteSongs({
+    noteText: `[What we did]\nWe worked on Ho Hey and Stand By Me.\n\n[Practice Goals]\nPerfect chord changes.`,
+    shelfSongs: [{ songId: 'fc_song_a', title: 'Ho Hey', status: 'working' }],
+    catalogueSongs: [
+      { songId: 'fc_song_a', title: 'Ho Hey', artist: 'The Lumineers' },
+      { songId: 'fc_song_b', title: 'Stand By Me', artist: 'Ben E. King' },
+      { songId: 'fc_song_c', title: 'Perfect', artist: 'Ed Sheeran' },
+    ],
+  });
+
+  assert.deepEqual(suggestions.map(({ songId, suggestionSource }) => ({ songId, suggestionSource })), [
+    { songId: 'fc_song_a', suggestionSource: 'current_shelf_exact' },
+    { songId: 'fc_song_b', suggestionSource: 'catalogue_exact' },
+  ]);
+});
+
+test('suggestPracticeNoteSongs requires a music-work cue for ambiguous one-word titles', () => {
+  const catalogueSongs = [{ songId: 'fc_song_perfect', title: 'Perfect', artist: 'Ed Sheeran' }];
+  assert.deepEqual(suggestPracticeNoteSongs({
+    noteText: '[What we did]\nThe chord change was perfect today.',
+    catalogueSongs,
+  }), []);
+  assert.deepEqual(suggestPracticeNoteSongs({
+    noteText: '[What we did]\nWe worked on Perfect today.',
+    catalogueSongs,
+  }).map((song) => song.songId), ['fc_song_perfect']);
+});
+
+test('suggestPracticeNoteSongs suppresses duplicate catalogue titles unless the shelf resolves them', () => {
+  const catalogueSongs = [
+    { songId: 'fc_song_a', title: 'New World Symphony', artist: 'Course A' },
+    { songId: 'fc_song_b', title: 'New World Symphony', artist: 'Course B' },
+  ];
+  const noteText = '[What we did]\nNew World Symphony.';
+  assert.deepEqual(suggestPracticeNoteSongs({ noteText, catalogueSongs }), []);
+  assert.deepEqual(suggestPracticeNoteSongs({
+    noteText,
+    catalogueSongs,
+    shelfSongs: [{ songId: 'fc_song_b', title: 'New World Symphony', status: 'working' }],
+  }).map((song) => song.songId), ['fc_song_b']);
 });
 
 test('buildPracticeNoteSnapshot skips unlinked notes', () => {
@@ -194,6 +266,7 @@ test('previewPracticeNoteMmsTestWrite posts a dry-run request', async () => {
     dashboardBaseUrl: 'http://localhost:3000',
     studentId: 'sdt_fBg9JN',
     noteText: 'Test note',
+    songIds: ['fc_song_a'],
     fetchImpl: async (url, options) => {
       requests.push({ url, options });
       return {
@@ -206,6 +279,7 @@ test('previewPracticeNoteMmsTestWrite posts a dry-run request', async () => {
   assert.equal(result.mode, 'dry_run');
   assert.equal(requests[0].url, 'http://localhost:3000/api/practice-notes/mms-test');
   assert.equal(JSON.parse(requests[0].options.body).mode, 'dry_run');
+  assert.deepEqual(JSON.parse(requests[0].options.body).songIds, ['fc_song_a']);
 });
 
 test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async () => {
@@ -216,6 +290,8 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
     noteText: 'Test note',
     targetAttendanceId: 'atn_test',
     attendanceStatus: 'AbsentNoMakeup',
+    songIds: ['fc_song_a'],
+    unlistedSongTitles: ['Tutor original'],
     noteSnapshot: {
       noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
       studentMmsId: 'sdt_fBg9JN',
@@ -238,6 +314,8 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
     mode: 'execute',
     targetAttendanceId: 'atn_test',
     attendanceStatus: 'AbsentNoMakeup',
+    songIds: ['fc_song_a'],
+    unlistedSongTitles: ['Tutor original'],
     noteSnapshot: {
       noteId: 'practice_note:sdt_fBg9JN:2026-06-12:test',
       studentMmsId: 'sdt_fBg9JN',

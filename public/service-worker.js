@@ -3,7 +3,7 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v20-model-trial';
+const CACHE_NAME = 'practice-chat-v22-song-suggestions';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
@@ -11,8 +11,8 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/styles.css',
-  '/src/app.js?v=20260717-recipient-confirm',
-  '/src/practice-note-sync.js?v=20260717-recipient-confirm',
+  '/src/app.js?v=20260804-song-suggestions',
+  '/src/practice-note-sync.js?v=20260804-song-suggestions',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'

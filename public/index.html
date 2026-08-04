@@ -94,6 +94,31 @@
                     Processed notes will appear here...
                 </div>
 
+                <fieldset id="songLinkPanel" class="song-link-panel" hidden>
+                    <legend>Songs in this lesson</legend>
+                    <p>Optional. Suggestions come from the note but are not saved until you select them.</p>
+                    <div id="songSuggestionSection" class="song-choice-section" hidden>
+                        <div class="song-choice-label">Suggested from your note</div>
+                        <div id="songSuggestions" class="song-choices"></div>
+                    </div>
+                    <div id="songShelfSection" class="song-choice-section" hidden>
+                        <div class="song-choice-label">Other songs on this student’s shelf</div>
+                        <div id="songChoices" class="song-choices"></div>
+                    </div>
+                    <details class="song-more-options">
+                        <summary id="songMoreSummary">Find another or add an unlisted song</summary>
+                        <label class="song-field-label" for="songSearchInput">Search the First Chord catalogue</label>
+                        <input id="songSearchInput" class="song-text-input" type="search" autocomplete="off" placeholder="Song title or artist">
+                        <div id="songSearchResults" class="song-choices song-search-results" aria-live="polite"></div>
+                        <label class="song-field-label" for="unlistedSongInput">Not in the catalogue</label>
+                        <div class="unlisted-song-entry">
+                            <input id="unlistedSongInput" class="song-text-input" type="text" maxlength="120" autocomplete="off" placeholder="Type the song title once">
+                            <button id="addUnlistedSongBtn" class="btn song-add-button" type="button">Add</button>
+                        </div>
+                        <div id="unlistedSongChoices" class="song-choices"></div>
+                    </details>
+                </fieldset>
+
                 <!-- Main Copy Button / fallback action -->
                 <button id="copyBtn" class="btn btn-success btn-large">
                     <span class="btn-icon">📋</span>
@@ -146,7 +171,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20260727-model-trial"></script>
+    <script type="module" src="/src/app.js?v=20260804-song-suggestions"></script>
 
     <!-- Service Worker Registration -->
     <script>
