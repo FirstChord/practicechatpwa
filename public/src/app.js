@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260806-note-formatting';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260806-note-formatting';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260806-quiet-editing';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260806-quiet-editing';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -12,7 +12,7 @@ import {
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260806-note-formatting';
+} from './practice-note-sync.js?v=20260806-quiet-editing';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -20,9 +20,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260806-note-formatting';
+} from './note-markup.js?v=20260806-quiet-editing';
 
-const PRACTICE_CHAT_BUILD = '20260806-note-formatting';
+const PRACTICE_CHAT_BUILD = '20260806-quiet-editing';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -302,7 +302,6 @@ class PracticeChatApp {
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.newBtn.addEventListener('click', () => this.resetForNew());
         this.processedEl.addEventListener('input', () => {
-            this.invalidateMmsPreview();
             this.refreshSongSuggestions();
             this.syncToolbarState();
         });
@@ -317,7 +316,6 @@ class PracticeChatApp {
                     return;
                 } else this.selectedSongIds.add(songId);
                 this.renderSongChoices();
-                this.invalidateMmsPreview();
                 return;
             }
             const removeButton = event.target.closest('[data-remove-unlisted]');
@@ -325,7 +323,6 @@ class PracticeChatApp {
                 this.unlistedSongTitles = this.unlistedSongTitles
                     .filter((title) => title !== removeButton.dataset.removeUnlisted);
                 this.renderSongChoices();
-                this.invalidateMmsPreview();
             }
         });
         this.songSearchInput?.addEventListener('input', () => this.renderSongSearchResults());
@@ -450,7 +447,6 @@ class PracticeChatApp {
         }
         this.unlistedSongInput.value = '';
         this.renderSongChoices();
-        this.invalidateMmsPreview();
     }
 
     getSelectedSongIds() {
@@ -483,11 +479,6 @@ class PracticeChatApp {
             this.copyBtn.style.display = 'none';
         }
         this.copyBtn.onclick = () => this.copyToClipboard();
-    }
-
-    invalidateMmsPreview() {
-        if (!this.lastMmsPreview || this.mmsWorkflowComplete) return;
-        this.showStatus('Notes updated. The final save will use the edited version.', 'info');
     }
 
     startTypedNotes() {
