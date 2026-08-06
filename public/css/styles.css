@@ -814,13 +814,75 @@ body {
     border-radius: 8px;
     padding: 20px;
     min-height: 120px;
-    max-height: 300px;
+    /* This is the note the tutor is actually editing, so it grows with the
+       content. It used to be capped at 300px, which put the main writing
+       surface behind an inner scrollbar and cut a normal three-section note off
+       mid-sentence. The viewport cap is a backstop for a very long note; the
+       page scrolls before the box does. */
+    max-height: min(70vh, 900px);
     overflow-y: auto;
     font-size: 15px;
     line-height: 1.6;
     color: var(--text-dark);
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+/* Formatting produced by the toolbar. Deliberately restrained: the note is
+   plain text underneath and these are the only three things it can carry. */
+.output-box strong {
+    font-weight: 700;
+}
+
+.output-box em {
+    font-style: italic;
+}
+
+.note-toolbar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.note-tool {
+    min-width: 38px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-dark);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.note-tool:hover {
+    background: var(--bg-light);
+}
+
+.note-tool[aria-pressed="true"] {
+    background: rgba(62, 141, 88, 0.12);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.note-tool:focus-visible {
+    outline: 3px solid rgba(62, 141, 88, 0.22);
+    outline-offset: 1px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .transcript-box {

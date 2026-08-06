@@ -24,6 +24,7 @@ A browser-based voice recording app for music teachers to quickly capture lesson
 
 - ✅ **Cloud Speech Recognition**: Real-time transcription via WebSocket
 - ✅ **Text Processing**: Removes "um", "uh", fixes grammar, music terminology
+- ✅ **Note formatting**: Bold, italic and bullets in the review editor, carried through to the parent email, the MMS note and the student portal
 - ✅ **Local Storage**: Automatically saves your last notes (24h)
 - ✅ **Reviewed song links**: Exact note-title matches are suggested after transcription, current-shelf songs are prioritised, and tutors can search the catalogue or record an explicitly unlisted title
 - ✅ **Copy to Clipboard**: One-click copy for pasting into emails/systems
@@ -43,6 +44,7 @@ Practice Chat PWA
 │       ├── app.js          # Main app logic
 │       ├── practice-note-sync.js # Optional dashboard snapshot handoff
 │       ├── asr-client.js   # Speech recognition
+│       ├── note-markup.js  # Editor <-> plain-text formatting markers
 │       └── text-processor.js # Text cleanup
 │
 └── Backend (Railway)
@@ -170,6 +172,34 @@ Once deployed, users can install the app:
 
 ---
 
+## Note Formatting (cross-repo contract)
+
+Tutors format in the review editor, but **the note that leaves this app is plain
+text**. `src/note-markup.js` serialises the contenteditable into three markers:
+
+```text
+**bold**      _italic_      "- " starting a line for a bullet
+```
+
+Every renderer on the dashboard side understands those markers
+(`lib/notes-markup.mjs` for the parent email and the MMS
+`StudentNote`, `components/shared/notes-formatting.js` for the student portal).
+Renderers **escape first and convert markers second** — markers are ASCII and
+survive escaping, so emphasis reaches a parent while pasted markup arrives as
+visible text. Nothing downstream ever receives HTML a tutor produced.
+
+Two rules that are easy to break:
+
+1. **Analysers read stripped text.** Song matching compares titles exactly and
+   the safety check works on word boundaries, so `**Clocks**` silently stops
+   matching `Clocks`. Use `readNotePlainText()`, not `readNoteMarkup()`.
+2. **The two implementations live in different repositories.** Changing the
+   markers here means changing them in the dashboard too. The durable contract
+   is recorded in the dashboard's
+   `docs/architecture/data/state-tabs.md` → Format Contracts.
+
+Notes written before this existed contain no markers and render unchanged.
+
 ## Dashboard Handoff
 
 Dashboard quick links can open Practice Chat with context:
@@ -233,7 +263,8 @@ Practice Chat PWA/
 │   │   ├── app.js         # Main app
 │   │   ├── practice-note-sync.js # Dashboard snapshot helper
 │   │   ├── asr-client.js  # Speech recognition
-│   │   └── text-processor.js # Text cleanup
+│   │       ├── note-markup.js  # Editor ↔ plain-text markers
+│       └── text-processor.js # Text cleanup
 │   └── icons/             # PWA icons
 ├── firebase.json          # Firebase config
 ├── .firebaserc            # Firebase project

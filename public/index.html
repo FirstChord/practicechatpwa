@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=20260806-note-formatting">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -90,6 +90,17 @@
             <div class="card">
                 <h3 class="card-subtitle">Review Lesson Notes</h3>
                 <p class="review-helper">You can edit these notes here before saving. This is the final note that will be saved and sent.</p>
+                <div class="note-toolbar" role="toolbar" aria-label="Formatting" aria-controls="processed">
+                    <button type="button" class="note-tool" data-format="bold" aria-pressed="false" title="Bold (Cmd/Ctrl+B)">
+                        <strong>B</strong><span class="sr-only">Bold</span>
+                    </button>
+                    <button type="button" class="note-tool" data-format="italic" aria-pressed="false" title="Italic (Cmd/Ctrl+I)">
+                        <em>I</em><span class="sr-only">Italic</span>
+                    </button>
+                    <button type="button" class="note-tool" data-format="bullet" aria-pressed="false" title="Bullet list">
+                        <span aria-hidden="true">•—</span><span class="sr-only">Bullet list</span>
+                    </button>
+                </div>
                 <div id="processed" class="output-box" contenteditable="true" spellcheck="true" aria-label="Editable lesson notes">
                     Processed notes will appear here...
                 </div>
@@ -171,7 +182,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20260804-song-suggestions"></script>
+    <script type="module" src="/src/app.js?v=20260806-note-formatting"></script>
 
     <!-- Service Worker Registration -->
     <script>

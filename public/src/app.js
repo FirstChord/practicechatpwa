@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260804-song-suggestions';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260804-song-suggestions';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260806-note-formatting';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260806-note-formatting';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -12,9 +12,17 @@ import {
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260804-song-suggestions';
+} from './practice-note-sync.js?v=20260806-note-formatting';
+import {
+    noteMarkupToHtml,
+    rawNoteText,
+    renderNoteMarkup,
+    serialiseNoteMarkup,
+    stripNoteMarkers,
+    toggleBulletLines
+} from './note-markup.js?v=20260806-note-formatting';
 
-const PRACTICE_CHAT_BUILD = '20260804-song-suggestions';
+const PRACTICE_CHAT_BUILD = '20260806-note-formatting';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -27,6 +35,8 @@ const QUESTION_LABELS = [
     "[Progress & Challenges]",
     "[Practice Goals]"
 ];
+
+const NOTE_PLACEHOLDER = 'Processed notes will appear here...';
 
 class PracticeChatApp {
     constructor() {
@@ -131,8 +141,157 @@ class PracticeChatApp {
         // Question section
         this.questionSection = document.getElementById('questionSection');
 
+        // Formatting toolbar
+        this.noteToolbar = document.querySelector('.note-toolbar');
+
         // Button state
         this.buttonState = 'start'; // start, stop, next, finish
+    }
+
+    // The note as it goes on the wire: emphasis expressed as markers, never as
+    // HTML. Everything that saves, sends or hashes the note reads this.
+    readNoteMarkup() {
+        return serialiseNoteMarkup(this.processedEl);
+    }
+
+    // The note as prose. Song matching compares titles exactly and counts
+    // characters backwards to find its cue, and the safety check works on word
+    // boundaries — a stray marker makes either fail silently, so anything that
+    // *analyses* the note reads this instead.
+    readNotePlainText() {
+        return stripNoteMarkers(this.readNoteMarkup());
+    }
+
+    isNotePlaceholder() {
+        return this.readNoteMarkup().trim() === NOTE_PLACEHOLDER;
+    }
+
+    setNoteContent(text = '') {
+        this.processedEl.innerHTML = renderNoteMarkup(text);
+        this.syncToolbarState();
+    }
+
+    bindNoteToolbar() {
+        if (!this.noteToolbar) return;
+
+        // mousedown, not click: the default would blur the editor and collapse
+        // the selection before the command could act on it.
+        this.noteToolbar.addEventListener('mousedown', (event) => {
+            const button = event.target.closest('[data-format]');
+            if (!button) return;
+            event.preventDefault();
+            this.applyNoteFormat(button.dataset.format);
+        });
+
+        // Cmd/Ctrl+B and +I already work natively inside a contenteditable; this
+        // only keeps the buttons showing the truth afterwards.
+        this.processedEl.addEventListener('keyup', () => this.syncToolbarState());
+        this.processedEl.addEventListener('mouseup', () => this.syncToolbarState());
+        this.processedEl.addEventListener('focus', () => this.syncToolbarState());
+
+        // Paste as plain text. The serialiser only understands its own handful
+        // of tags, so pasted markup would be silently flattened anyway — doing it
+        // here means the tutor sees immediately what they are actually getting.
+        this.processedEl.addEventListener('paste', (event) => {
+            const text = event.clipboardData?.getData('text/plain');
+            if (text === undefined) return;
+            event.preventDefault();
+            document.execCommand('insertText', false, text);
+        });
+    }
+
+    applyNoteFormat(format) {
+        this.processedEl.focus();
+
+        if (format === 'bullet') {
+            this.toggleSelectedLinesAsBullets();
+        } else {
+            // styleWithCSS off keeps the result as <b>/<i> tags rather than
+            // inline styles, which is what the serialiser reads most reliably.
+            document.execCommand('styleWithCSS', false, false);
+            document.execCommand(format, false, null);
+        }
+
+        this.processedEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Bullets are literal "- " text, so this rewrites whole lines rather than
+    // asking execCommand for a <ul> the wire format has no way to carry.
+    toggleSelectedLinesAsBullets() {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+
+        // Measured in raw space on both sides. readNoteMarkup() trims and
+        // collapses blank runs, so using it here would shorten every prefix and
+        // shift the line index — which bulleted the heading above the selection.
+        const lines = rawNoteText(this.processedEl).split('\n');
+        const range = selection.getRangeAt(0);
+
+        const lineOf = (node, offset) => {
+            const probe = document.createRange();
+            probe.setStart(this.processedEl, 0);
+            probe.setEnd(node, offset);
+            const holder = document.createElement('div');
+            holder.appendChild(probe.cloneContents());
+            return rawNoteText(holder).split('\n').length - 1;
+        };
+
+        const startLine = lineOf(range.startContainer, range.startOffset);
+        const endLine = lineOf(range.endContainer, range.endOffset);
+
+        const target = lines.slice(startLine, endLine + 1);
+        const { lines: toggled } = toggleBulletLines(target);
+        lines.splice(startLine, target.length, ...toggled);
+
+        this.setNoteContent(lines.join('\n'));
+    }
+
+    syncToolbarState() {
+        if (!this.noteToolbar) return;
+        for (const button of this.noteToolbar.querySelectorAll('[data-format]')) {
+            const format = button.dataset.format;
+            let active = false;
+            try {
+                active = format === 'bullet'
+                    ? /^[ \t]*[-*][ \t]+/.test(this.currentNoteLine())
+                    : document.queryCommandState(format);
+            } catch {
+                active = false;
+            }
+            button.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    currentNoteLine() {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !this.processedEl.contains(selection.anchorNode)) return '';
+        const probe = document.createRange();
+        probe.setStart(this.processedEl, 0);
+        probe.setEnd(selection.anchorNode, selection.anchorOffset);
+        const holder = document.createElement('div');
+        holder.appendChild(probe.cloneContents());
+        // Raw on both sides, for the same reason as the bullet toggle.
+        const lineIndex = rawNoteText(holder).split('\n').length - 1;
+        return rawNoteText(this.processedEl).split('\n')[lineIndex] || '';
+    }
+
+    // Copy the note twice over: markers for anything plain, real HTML for MMS's
+    // rich editor. Without the HTML flavour the legacy paste-into-MMS flow would
+    // show the tutor literal asterisks.
+    async writeNoteToClipboard(text) {
+        if (typeof ClipboardItem === 'function' && navigator.clipboard?.write) {
+            try {
+                await navigator.clipboard.write([new ClipboardItem({
+                    'text/plain': new Blob([stripNoteMarkers(text)], { type: 'text/plain' }),
+                    'text/html': new Blob([noteMarkupToHtml(text)], { type: 'text/html' })
+                })]);
+                return;
+            } catch (error) {
+                // Older WebKit rejects Blob sources; the plain path still works.
+                console.warn('Rich clipboard unavailable, copying plain text:', error);
+            }
+        }
+        await navigator.clipboard.writeText(stripNoteMarkers(text));
     }
 
     bindEvents() {
@@ -145,7 +304,9 @@ class PracticeChatApp {
         this.processedEl.addEventListener('input', () => {
             this.invalidateMmsPreview();
             this.refreshSongSuggestions();
+            this.syncToolbarState();
         });
+        this.bindNoteToolbar();
         this.songLinkPanel?.addEventListener('click', (event) => {
             const button = event.target.closest('[data-song-id]');
             if (button && !this.songSelectionLocked) {
@@ -244,7 +405,7 @@ class PracticeChatApp {
     refreshSongSuggestions() {
         if (this.songSelectionLocked) return;
         this.suggestedSongs = suggestPracticeNoteSongs({
-            noteText: this.processedEl?.textContent || '',
+            noteText: this.readNotePlainText(),
             shelfSongs: this.availableSongs,
             catalogueSongs: this.catalogueSongs
         });
@@ -670,19 +831,19 @@ class PracticeChatApp {
 
 
     async copyToClipboard() {
-        const text = this.processedEl.textContent;
+        const text = this.readNoteMarkup();
 
-        if (!text || text === 'Processed notes will appear here...') {
+        if (!text || this.isNotePlaceholder()) {
             this.showStatus('No content to copy', 'warning');
             return;
         }
 
         // The legacy path pastes into MMS by hand, so this warns rather than
         // gating — the tutor still sees the note before anything is sent.
-        const safety = checkNoteSafety(text);
+        const safety = checkNoteSafety(this.readNotePlainText());
 
         try {
-            await navigator.clipboard.writeText(text);
+            await this.writeNoteToClipboard(text);
             const snapshot = await this.saveDashboardSnapshotForCurrentNote();
             if (!safety.ok) {
                 console.warn('Practice Chat safety flag:', safety.findings);
@@ -716,7 +877,7 @@ class PracticeChatApp {
             return null;
         }
 
-        const text = this.processedEl.textContent;
+        const text = this.readNoteMarkup();
         const snapshot = buildPracticeNoteSnapshot({
             context: this.context,
             noteText: text,
@@ -770,8 +931,8 @@ class PracticeChatApp {
     }
 
     getCurrentNoteText() {
-        const text = this.processedEl.textContent.trim();
-        if (!text || text === 'Processed notes will appear here...') {
+        const text = this.readNoteMarkup().trim();
+        if (!text || this.isNotePlaceholder()) {
             this.showStatus('No lesson note to test', 'warning');
             return '';
         }
@@ -1269,7 +1430,7 @@ class PracticeChatApp {
         this.suggestedSongs = [];
         this.songSelectionLocked = false;
         this.renderSongChoices();
-        this.processedEl.textContent = 'Processed notes will appear here...';
+        this.processedEl.textContent = NOTE_PLACEHOLDER;
         this.outputSection.classList.remove('show');
         this.questionSection.style.display = 'block';
 
@@ -1289,7 +1450,7 @@ class PracticeChatApp {
         this.suggestedSongs = [];
         this.songSelectionLocked = false;
         this.renderSongChoices();
-        this.processedEl.textContent = 'Processed notes will appear here...';
+        this.processedEl.textContent = NOTE_PLACEHOLDER;
         this.outputSection.classList.remove('show');
         this.questionSection.style.display = 'block';
 
@@ -1326,7 +1487,9 @@ class PracticeChatApp {
 
                 // Only load if less than 24 hours old
                 if (ageHours < 24) {
-                    this.processedEl.textContent = lastNotes;
+                    // A saved draft is markup, so restore it as formatting
+                    // rather than as visible asterisks.
+                    this.setNoteContent(lastNotes);
                     this.outputSection.classList.add('show');
                     this.showStatus(`Previous notes loaded (${Math.round(ageHours)}h ago)`, 'info');
                 }
