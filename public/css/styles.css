@@ -845,6 +845,9 @@ body {
 }
 
 .note-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-width: 38px;
     height: 34px;
     padding: 0 10px;
@@ -860,6 +863,32 @@ body {
 
 .note-tool:hover {
     background: var(--bg-light);
+}
+
+/* B and I are drawn in a serif face on purpose. In the body sans-serif an
+   italic capital I is a bare slanted bar and reads as a slash; the serifs give
+   it a top and a foot, so it is unmistakably a letter. */
+.note-tool-glyph {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 17px;
+    line-height: 1;
+}
+
+.note-tool-glyph-bold {
+    font-weight: 700;
+}
+
+.note-tool-glyph-italic {
+    font-style: italic;
+    /* The slant leaves a visual gap on the right, so nudge it back to centre. */
+    padding-right: 2px;
+}
+
+.note-tool-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+    fill: currentColor;
 }
 
 .note-tool[aria-pressed="true"] {

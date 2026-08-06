@@ -92,13 +92,22 @@
                 <p class="review-helper">You can edit these notes here before saving. This is the final note that will be saved and sent.</p>
                 <div class="note-toolbar" role="toolbar" aria-label="Formatting" aria-controls="processed">
                     <button type="button" class="note-tool" data-format="bold" aria-pressed="false" title="Bold (Cmd/Ctrl+B)">
-                        <strong>B</strong><span class="sr-only">Bold</span>
+                        <span class="note-tool-glyph note-tool-glyph-bold" aria-hidden="true">B</span><span class="sr-only">Bold</span>
                     </button>
+                    <!-- A serif italic I, not a sans-serif one: the serifs are what
+                         stop a slanted bar reading as a slash. -->
                     <button type="button" class="note-tool" data-format="italic" aria-pressed="false" title="Italic (Cmd/Ctrl+I)">
-                        <em>I</em><span class="sr-only">Italic</span>
+                        <span class="note-tool-glyph note-tool-glyph-italic" aria-hidden="true">I</span><span class="sr-only">Italic</span>
                     </button>
                     <button type="button" class="note-tool" data-format="bullet" aria-pressed="false" title="Bullet list">
-                        <span aria-hidden="true">•—</span><span class="sr-only">Bullet list</span>
+                        <svg class="note-tool-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                            <circle cx="2.25" cy="3.5" r="1.5"/>
+                            <circle cx="2.25" cy="8" r="1.5"/>
+                            <circle cx="2.25" cy="12.5" r="1.5"/>
+                            <rect x="6" y="2.75" width="9.5" height="1.5" rx="0.75"/>
+                            <rect x="6" y="7.25" width="9.5" height="1.5" rx="0.75"/>
+                            <rect x="6" y="11.75" width="9.5" height="1.5" rx="0.75"/>
+                        </svg><span class="sr-only">Bullet list</span>
                     </button>
                 </div>
                 <div id="processed" class="output-box" contenteditable="true" spellcheck="true" aria-label="Editable lesson notes">
