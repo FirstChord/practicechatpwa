@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260806-quiet-editing';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260806-quiet-editing';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260807-song-checkboxes';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260807-song-checkboxes';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -12,7 +12,7 @@ import {
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260806-quiet-editing';
+} from './practice-note-sync.js?v=20260807-song-checkboxes';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -20,9 +20,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260806-quiet-editing';
+} from './note-markup.js?v=20260807-song-checkboxes';
 
-const PRACTICE_CHAT_BUILD = '20260806-quiet-editing';
+const PRACTICE_CHAT_BUILD = '20260807-song-checkboxes';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -306,18 +306,26 @@ class PracticeChatApp {
             this.syncToolbarState();
         });
         this.bindNoteToolbar();
-        this.songLinkPanel?.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-song-id]');
-            if (button && !this.songSelectionLocked) {
-                const songId = button.dataset.songId;
-                if (this.selectedSongIds.has(songId)) this.selectedSongIds.delete(songId);
-                else if (this.selectedSongIds.size >= 12) {
-                    this.showStatus('Select no more than twelve songs for one note.', 'warning');
-                    return;
-                } else this.selectedSongIds.add(songId);
-                this.renderSongChoices();
+        // A change listener, not a delegated click: clicking a label fires a
+        // click on the label AND a synthesised one on the input it wraps, so
+        // click delegation would toggle twice and appear to do nothing.
+        this.songLinkPanel?.addEventListener('change', (event) => {
+            const input = event.target.closest('input[data-song-id]');
+            if (!input || this.songSelectionLocked) return;
+            const songId = input.dataset.songId;
+            if (!input.checked) {
+                this.selectedSongIds.delete(songId);
+            } else if (this.selectedSongIds.size >= 12) {
+                // The browser has already ticked the box, so refuse visibly.
+                input.checked = false;
+                this.showStatus('Select no more than twelve songs for one note.', 'warning');
                 return;
+            } else {
+                this.selectedSongIds.add(songId);
             }
+            this.syncSongSelectionState();
+        });
+        this.songLinkPanel?.addEventListener('click', (event) => {
             const removeButton = event.target.closest('[data-remove-unlisted]');
             if (removeButton && !this.songSelectionLocked) {
                 this.unlistedSongTitles = this.unlistedSongTitles
@@ -362,14 +370,14 @@ class PracticeChatApp {
         if (this.songSuggestionSection && this.songSuggestionsEl) {
             this.songSuggestionSection.hidden = this.suggestedSongs.length === 0;
             this.songSuggestionsEl.innerHTML = this.suggestedSongs
-                .map((song) => this.songChoiceButton(song, { suggested: true }))
+                .map((song) => this.songChoiceRow(song, { suggested: true }))
                 .join('');
         }
         if (this.songShelfSection) {
             this.songShelfSection.hidden = otherShelfSongs.length === 0;
         }
         this.songChoicesEl.innerHTML = otherShelfSongs
-            .map((song) => this.songChoiceButton(song))
+            .map((song) => this.songChoiceRow(song))
             .join('');
         if (this.unlistedSongChoicesEl) {
             this.unlistedSongChoicesEl.innerHTML = this.unlistedSongTitles.map((title) => `
@@ -382,21 +390,54 @@ class PracticeChatApp {
         if (this.songSearchInput) this.songSearchInput.disabled = this.songSelectionLocked;
         if (this.unlistedSongInput) this.unlistedSongInput.disabled = this.songSelectionLocked;
         if (this.addUnlistedSongBtn) this.addUnlistedSongBtn.disabled = this.songSelectionLocked;
-        if (this.songMoreSummary) {
-            const visibleIds = new Set([...this.suggestedSongs, ...this.availableSongs].map((song) => song.songId));
-            const extraCount = [...this.selectedSongIds].filter((songId) => !visibleIds.has(songId)).length
-                + this.unlistedSongTitles.length;
-            this.songMoreSummary.textContent = `Find another or add an unlisted song${extraCount ? ` · ${extraCount} added` : ''}`;
-        }
+        this.updateSongMoreSummary();
         this.renderSongSearchResults();
     }
 
-    songChoiceButton(song, { suggested = false } = {}) {
+    // A real checkbox in a full-width label, not a tinted pill.
+    //
+    // The pill had the affordance and almost no signifier: its border measured
+    // 1.55:1 against its own fill where WCAG 1.4.11 asks 3:1 for a control
+    // boundary, and its fill 1.07:1 against the card — so "you may press this"
+    // was carried by something very close to invisible, and selection was
+    // signalled by fill colour alone. An empty checkbox says the same thing
+    // without being taught, and a tick is a shape as well as a colour.
+    songChoiceRow(song, { suggested = false } = {}) {
         const selected = this.selectedSongIds.has(song.songId);
-        const detail = song.onShelf || this.availableSongs.some((entry) => entry.songId === song.songId)
-            ? 'Current shelf'
-            : song.artist || 'Catalogue';
-        return `<button type="button" class="song-choice${selected ? ' selected' : ''}${suggested ? ' suggested' : ''}" data-song-id="${this.escapeHtml(song.songId)}" aria-pressed="${selected}"${this.songSelectionLocked ? ' disabled' : ''}><span>${this.escapeHtml(song.title)}</span>${suggested ? `<small>${this.escapeHtml(detail)}</small>` : ''}</button>`;
+        // The hint earns its place only where it disambiguates. A suggested row
+        // sits under "Suggested from your note" and a shelf row under "Other
+        // songs on this student's shelf", so repeating either per row is noise;
+        // a search result genuinely needs its artist ("Crazy" is two songs).
+        const onShelf = song.onShelf
+            || this.availableSongs.some((entry) => entry.songId === song.songId);
+        const hint = suggested || onShelf ? '' : song.artist || '';
+        return `<label class="song-choice${selected ? ' selected' : ''}">`
+            + `<input type="checkbox" data-song-id="${this.escapeHtml(song.songId)}"${selected ? ' checked' : ''}${this.songSelectionLocked ? ' disabled' : ''}>`
+            + `<span class="song-choice-title">${this.escapeHtml(song.title)}</span>`
+            + (hint ? `<span class="song-choice-hint">${this.escapeHtml(hint)}</span>` : '')
+            + '</label>';
+    }
+
+    // Selection changes update the boxes in place rather than re-rendering the
+    // list: a full innerHTML swap would drop keyboard focus mid-tab, and the
+    // same song can appear in both the shelf and the search results, so every
+    // box for that id has to agree.
+    syncSongSelectionState() {
+        this.songLinkPanel?.querySelectorAll('input[data-song-id]').forEach((input) => {
+            const isSelected = this.selectedSongIds.has(input.dataset.songId);
+            input.checked = isSelected;
+            input.disabled = this.songSelectionLocked;
+            input.closest('.song-choice')?.classList.toggle('selected', isSelected);
+        });
+        this.updateSongMoreSummary();
+    }
+
+    updateSongMoreSummary() {
+        if (!this.songMoreSummary) return;
+        const visibleIds = new Set([...this.suggestedSongs, ...this.availableSongs].map((song) => song.songId));
+        const extraCount = [...this.selectedSongIds].filter((songId) => !visibleIds.has(songId)).length
+            + this.unlistedSongTitles.length;
+        this.songMoreSummary.textContent = `Find another or add an unlisted song${extraCount ? ` · ${extraCount} added` : ''}`;
     }
 
     refreshSongSuggestions() {
@@ -426,7 +467,7 @@ class PracticeChatApp {
             })
             .slice(0, 8);
         this.songSearchResultsEl.innerHTML = results.length
-            ? results.map((song) => this.songChoiceButton(song)).join('')
+            ? results.map((song) => this.songChoiceRow(song)).join('')
             : '<p class="song-search-empty">No catalogue match. Add it as unlisted below.</p>';
     }
 

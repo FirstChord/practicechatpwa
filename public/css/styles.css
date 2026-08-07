@@ -184,10 +184,13 @@ body {
     font-size: 13px;
 }
 
+/* A vertical list, not a wrapped row of pills. Song titles vary wildly in
+   length, so wrapping produced an irregular block with no scan line; stacked
+   rows give the eye one left edge to run down. */
 .song-choices {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .song-choice-section + .song-choice-section {
@@ -203,46 +206,65 @@ body {
     font-weight: 700;
 }
 
+/* The checkbox is the signifier. An empty box says "you may tick me" without
+   being taught, which is why the row itself needs no border, tint or
+   instruction copy to look interactive. */
 .song-choice {
-    border: 1px solid rgba(87, 65, 217, 0.24);
-    border-radius: 999px;
-    background: white;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: transparent;
     color: var(--text-dark);
-    padding: 8px 12px;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 14px;
     cursor: pointer;
 }
 
-.song-choice.suggested {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    border-color: rgba(62, 141, 88, 0.45);
-    background: rgba(62, 141, 88, 0.06);
+.song-choice input[type="checkbox"] {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--info-color);
+    cursor: pointer;
 }
 
-.song-choice.suggested small {
-    color: var(--text-light);
-    font-size: 10px;
+.song-choice-title {
+    flex: 1 1 auto;
     font-weight: 600;
 }
 
-.song-choice.suggested.selected small {
-    color: rgba(255, 255, 255, 0.82);
+.song-choice-hint {
+    flex: none;
+    color: var(--text-light);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Ticked state carries a tick (shape) as well as weight, so it never depends
+   on colour alone. */
+.song-choice.selected .song-choice-title {
+    font-weight: 700;
 }
 
 .song-choice.selected {
-    border-color: var(--info-color);
-    background: var(--info-color);
-    color: white;
+    background: rgba(87, 65, 217, 0.07);
 }
 
-.song-choice:disabled {
+.song-choice:hover {
+    background: rgba(87, 65, 217, 0.05);
+}
+
+.song-choice:focus-within {
+    outline: 2px solid var(--info-color);
+    outline-offset: 1px;
+}
+
+.song-choice:has(input:disabled) {
     cursor: default;
-    opacity: 0.82;
+    opacity: 0.7;
 }
 
 .song-more-options {
