@@ -231,13 +231,25 @@ body {
     cursor: pointer;
 }
 
+/* The title does not grow. Letting it fill the row pushed the artist to the
+   far edge — 265px from its own title at panel width — and that hint exists to
+   tell two songs called "Crazy" apart, which it cannot do from across the row.
+   It sits immediately after the title instead. */
 .song-choice-title {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 600;
 }
 
 .song-choice-hint {
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--text-light);
     font-size: 11px;
     font-weight: 600;
