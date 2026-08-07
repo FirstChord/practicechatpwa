@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260807-song-checkboxes';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260807-song-checkboxes';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260807-song-checkbox-hints';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260807-song-checkbox-hints';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -12,7 +12,7 @@ import {
     previewPracticeNoteMmsTestWrite,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260807-song-checkboxes';
+} from './practice-note-sync.js?v=20260807-song-checkbox-hints';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -20,9 +20,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260807-song-checkboxes';
+} from './note-markup.js?v=20260807-song-checkbox-hints';
 
-const PRACTICE_CHAT_BUILD = '20260807-song-checkboxes';
+const PRACTICE_CHAT_BUILD = '20260807-song-checkbox-hints';
 
 const QUESTIONS = [
     "What did we do in the lesson?",

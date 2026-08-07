@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v25-song-checkboxes';
+const CACHE_NAME = 'practice-chat-v26-song-checkbox-hints';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20260807-song-checkboxes',
-  '/src/app.js?v=20260807-song-checkboxes',
-  '/src/practice-note-sync.js?v=20260807-song-checkboxes',
-  '/src/note-markup.js?v=20260807-song-checkboxes',
+  '/css/styles.css?v=20260807-song-checkbox-hints',
+  '/src/app.js?v=20260807-song-checkbox-hints',
+  '/src/practice-note-sync.js?v=20260807-song-checkbox-hints',
+  '/src/note-markup.js?v=20260807-song-checkbox-hints',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
