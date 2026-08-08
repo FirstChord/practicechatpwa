@@ -1,11 +1,36 @@
-# Practice Chat PWA 🎵
+# Practice Chat 🎵
 
-Progressive Web App for capturing lesson conversations and practice reflections.
+Captures lesson conversations and practice reflections. Tutors use it on the
+side screen next to the dashboard; it is not a phone app in practice, even
+though it is built as a PWA and still installs like one.
 
 **Status**: ✅ Live in Production
 **Version**: 1.0.0
 **Live URL**: https://practice-chat-pwa.web.app
 **Converted from**: HW Notes 3 Chrome Extension
+
+---
+
+## Names — three of them, only one is free
+
+The folder was called `Practice Chat PWA` until 2026-08-08. It is now
+`practice-chat`. The other two names still carry `pwa` **and cannot be
+changed**:
+
+| Name | Where it lives | Change it? |
+|---|---|---|
+| `practice-chat` | this local folder, the `practicechat` shell alias | ✅ free — it is only a folder |
+| `practicechatpwa` | the GitHub repo, and `repository`/`bugs`/`homepage` in `package.json` | ⚠️ renameable, but outward-facing; no reason to |
+| `practice-chat-pwa` | Firebase **project id** (`.firebaserc`), hosting **site** (`firebase.json`), and the live domain `practice-chat-pwa.web.app` | ❌ never |
+
+The last row is load-bearing in the **dashboard**, not here:
+`lib/admin/practice-chat-auth.mjs` pins `https://practice-chat-pwa.web.app` in
+its CORS allowlist and uses it as the fallback origin, and
+`components/navigation/QuickLinks.js` opens it. A Firebase project id also
+cannot be renamed at all. Renaming the site would break the origin allowlist,
+the dashboard's Practice Chat launcher, and every bookmark — so `pwa` in a
+**URL** is correct and permanent, while `pwa` in a **folder name** was just
+stale.
 
 ---
 
@@ -36,7 +61,7 @@ A browser-based voice recording app for music teachers to quickly capture lesson
 ## 🏗️ Architecture
 
 ```
-Practice Chat PWA
+Practice Chat
 ├── Frontend (PWA)
 │   ├── index.html          # Main UI
 │   ├── css/styles.css      # Styling
@@ -62,7 +87,7 @@ Practice Chat PWA
 
 ```bash
 # Navigate to project
-cd "Desktop/Tools:Games/FC Admin Tools/Practice Chat PWA/public"
+cd "Desktop/Tools:Games/FC Admin Tools/practice-chat/public"
 
 # Start a local server (Python)
 python3 -m http.server 8000
@@ -86,7 +111,7 @@ npm install -g firebase-tools
 firebase login
 
 # Navigate to project root
-cd "Desktop/Tools:Games/FC Admin Tools/Practice Chat PWA"
+cd "Desktop/Tools:Games/FC Admin Tools/practice-chat"
 
 # Initialize Firebase (if first time)
 firebase init hosting
@@ -252,7 +277,7 @@ Rollback path: revert the dashboard `Practice_Notes_Log` commit and this PWA han
 
 ### Project Structure
 ```
-Practice Chat PWA/
+practice-chat/
 ├── public/                 # All web files
 │   ├── index.html         # Main page
 │   ├── manifest.json      # PWA manifest
@@ -342,4 +367,4 @@ For issues or questions, contact Finn.
 
 ---
 
-**Practice Chat PWA** - From lesson to notes in 60 seconds! 🎵
+**Practice Chat** - From lesson to notes in 60 seconds! 🎵

@@ -1,6 +1,6 @@
 # Firebase Setup & Auto-Deploy Guide
 
-This guide will help you deploy Practice Chat PWA to Firebase Hosting and set up auto-deploy from GitHub.
+This guide will help you deploy Practice Chat to Firebase Hosting and set up auto-deploy from GitHub.
 
 ---
 
@@ -19,7 +19,7 @@ This guide will help you deploy Practice Chat PWA to Firebase Hosting and set up
 ### 1.1 Login to Firebase
 
 ```bash
-cd "/Users/finnlemarinel/Desktop/Tools:Games/FC Admin Tools/Practice Chat PWA"
+cd "/Users/finnlemarinel/Desktop/Tools:Games/FC Admin Tools/practice-chat"
 npx firebase login
 ```
 
@@ -91,7 +91,7 @@ This will:
 Make a small change and push:
 
 ```bash
-cd "/Users/finnlemarinel/Desktop/Tools:Games/FC Admin Tools/Practice Chat PWA"
+cd "/Users/finnlemarinel/Desktop/Tools:Games/FC Admin Tools/practice-chat"
 
 # Edit README or make any small change
 echo "# Test deployment" >> README.md

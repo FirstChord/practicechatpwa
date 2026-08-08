@@ -1,5 +1,5 @@
 /**
- * Service Worker for Practice Chat PWA
+ * Service Worker for Practice Chat
  * Provides offline support and caching
  */
 
