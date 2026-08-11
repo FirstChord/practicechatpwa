@@ -1220,3 +1220,113 @@ body {
     color: var(--secondary-color);
     font-weight: 600;
 }
+
+/* Evaluation Rating Card
+ *
+ * Six-week evaluation only: hidden unless the dashboard enabled prompts for
+ * this tutor and this session was sampled. Deliberately quieter than every
+ * other card on this screen — it is the one element here that asks something of
+ * the tutor rather than doing something for them, so it must not compete with
+ * the finish button beside it.
+ *
+ * Sized for the ~520px side panel Practice Chat actually runs in, not a phone.
+ */
+.rating-card {
+    background: rgba(62, 141, 88, 0.06);
+    border: 1px solid rgba(62, 141, 88, 0.25);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 15px;
+}
+
+.rating-card[hidden] {
+    display: none;
+}
+
+.rating-question {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.rating-hint {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+.rating-scores {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* Equal-width so the row reads as a scale rather than five separate buttons,
+ * and each stays a comfortable tap target at panel width. */
+.rating-score {
+    flex: 1;
+    min-height: 40px;
+    border: 1px solid rgba(62, 141, 88, 0.35);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-dark);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.rating-score:hover {
+    background: rgba(62, 141, 88, 0.12);
+    border-color: var(--primary-color);
+}
+
+.rating-score:focus-visible {
+    outline: 2px solid var(--info-color);
+    outline-offset: 2px;
+}
+
+.rating-scale-legend {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.rating-comment-label {
+    display: block;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+.rating-comment {
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    background: #fff;
+    color: var(--text-dark);
+}
+
+.rating-comment:focus-visible {
+    outline: 2px solid var(--info-color);
+    outline-offset: 1px;
+}
+
+.rating-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+/* Opting out is a real choice, not a dark pattern: same size and same reach as
+ * Skip, just not the thing the eye lands on first. */
+.rating-opt-out {
+    color: var(--text-light);
+}

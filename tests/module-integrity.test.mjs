@@ -134,6 +134,12 @@ test('app.js still defines the methods the lesson-finishing flow depends on', ()
     'renderMmsPartialCompletion', 'renderMmsLogWarning', 'renderMmsSavingState',
     'notifyDashboardPracticeChatComplete', 'saveDashboardSnapshotForCurrentNote',
     'copyToClipboard', 'takeAttendance', 'startTypedNotes', 'escapeHtml',
+    // Evaluation telemetry. Here for a different reason from the rest: losing
+    // these would not break a lesson at all, which is exactly why nobody would
+    // notice. Six weeks of silently-missing measurement is unrecoverable — the
+    // lessons have happened.
+    'sendSessionTelemetry', 'bindSessionFlush', 'finishSession',
+    'maybeShowRatingCard', 'answerRating',
   ];
 
   const defined = definedMethods(read('app.js'));

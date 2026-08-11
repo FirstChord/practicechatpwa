@@ -9,6 +9,7 @@ import {
   getPracticeChatContext,
   isLocalMmsWriteTestAvailable,
   previewPracticeNoteMmsTestWrite,
+  savePracticeChatSession,
   savePracticeNoteSnapshot,
   splitStructuredNoteText,
   suggestPracticeNoteSongs,
@@ -23,7 +24,101 @@ test('getPracticeChatContext reads dashboard handoff query params', () => {
     tutor: 'Dean',
     practiceChatSecret: 'secret-token',
     dashboardBaseUrl: 'https://example.com',
+    // Evaluation context, absent unless the dashboard sends it.
+    evalPrompt: false,
+    evalSample: 1,
+    priorNoteExists: false,
+    priorNoteAgeDays: undefined,
+    priorHistoryOpened: false,
   });
+});
+
+test('getPracticeChatContext reads the evaluation params', () => {
+  const context = getPracticeChatContext(
+    '?studentId=sdt_1&tutor=Finn&evalPrompt=1&evalSample=4&priorNoteExists=1&priorNoteAgeDays=7&priorHistoryOpened=1'
+  );
+
+  assert.equal(context.evalPrompt, true);
+  assert.equal(context.evalSample, 4);
+  assert.equal(context.priorNoteExists, true);
+  assert.equal(context.priorNoteAgeDays, 7);
+  assert.equal(context.priorHistoryOpened, true);
+});
+
+test('the evaluation params fail closed on anything unexpected', () => {
+  // A prompt shown because a stray query param looked truthy would be an
+  // interruption nobody agreed to.
+  for (const search of ['?evalPrompt=true', '?evalPrompt=yes', '?evalPrompt=0', '?evalPrompt']) {
+    assert.equal(getPracticeChatContext(search).evalPrompt, false, search);
+  }
+  // A bad sample rate becomes 1 rather than silencing the prompt entirely: a
+  // prompt nobody ever sees is worse than no prompt, because it looks configured.
+  for (const search of ['?evalSample=0', '?evalSample=-2', '?evalSample=weekly', '?evalSample=']) {
+    assert.equal(getPracticeChatContext(search).evalSample, 1, search);
+  }
+});
+
+test('the launch URL never carries the evaluation roster', () => {
+  // The server decides who is enabled. If a tutor list ever reached this app it
+  // would be publishing who is in the trial, in a URL, in a public PWA.
+  const context = getPracticeChatContext('?studentId=sdt_1&tutor=Finn&evalPrompt=1&evalSample=4');
+  const serialised = JSON.stringify(context);
+  assert.equal(serialised.includes('Dean'), false);
+  assert.equal(Object.keys(context).some((key) => /tutors|roster|allow/i.test(key)), false);
+});
+
+test('savePracticeChatSession stays silent when it cannot send', async () => {
+  // Measurement must never interrupt, delay or fail a lesson.
+  const failing = () => Promise.reject(new Error('offline'));
+  const result = await savePracticeChatSession({
+    dashboardBaseUrl: 'https://example.com',
+    payload: { sessionId: 'pcs_1', studentId: 'sdt_1' },
+    fetchImpl: failing,
+  });
+  assert.deepEqual(result, { ok: false, skipped: true });
+});
+
+test('savePracticeChatSession does nothing without dashboard context', async () => {
+  let called = false;
+  const spy = () => { called = true; return Promise.resolve({ ok: true, status: 200 }); };
+
+  for (const payload of [null, { sessionId: '', studentId: 'sdt_1' }, { sessionId: 'pcs_1', studentId: '' }]) {
+    const result = await savePracticeChatSession({
+      dashboardBaseUrl: 'https://example.com',
+      payload,
+      fetchImpl: spy,
+    });
+    assert.deepEqual(result, { skipped: true });
+  }
+
+  const noDashboard = await savePracticeChatSession({
+    dashboardBaseUrl: '',
+    payload: { sessionId: 'pcs_1', studentId: 'sdt_1' },
+    fetchImpl: spy,
+  });
+  assert.deepEqual(noDashboard, { skipped: true });
+  assert.equal(called, false, 'a bookmarked PWA with no dashboard context records nothing');
+});
+
+test('savePracticeChatSession posts the payload with the shared secret', async () => {
+  let seen = null;
+  const spy = (url, options) => {
+    seen = { url, options };
+    return Promise.resolve({ ok: true, status: 200 });
+  };
+
+  await savePracticeChatSession({
+    dashboardBaseUrl: 'https://example.com',
+    payload: { sessionId: 'pcs_1', studentId: 'sdt_1', phase: 'finished' },
+    practiceChatSecret: 'secret-token',
+    keepalive: true,
+    fetchImpl: spy,
+  });
+
+  assert.equal(seen.url, 'https://example.com/api/practice-chat-sessions');
+  assert.equal(seen.options.headers['X-FirstChord-PracticeChat-Secret'], 'secret-token');
+  assert.equal(seen.options.keepalive, true, 'the final write must survive the panel closing');
+  assert.equal(JSON.parse(seen.options.body).phase, 'finished');
 });
 
 test('buildPracticeNoteId is stable for the same student, date, and note text', () => {

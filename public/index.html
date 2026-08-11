@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css?v=20260807-song-checkbox-hints">
+    <link rel="stylesheet" href="/css/styles.css?v=20260808-eval-telemetry">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -180,6 +180,36 @@
                     <div id="mmsPreview" class="mms-test-preview" style="display: none;"></div>
                 </div>
 
+                <!--
+                    Six-week evaluation. Hidden unless the dashboard enabled it
+                    for this tutor and this session was sampled, so for everyone
+                    else this markup is inert and the screen is unchanged.
+
+                    The question is about the software, not the tutor: "did we
+                    get this right" is a bug report a colleague can help with,
+                    where "rate this note" would be an assessment of their work.
+                -->
+                <div id="ratingCard" class="rating-card" hidden>
+                    <p class="rating-question">Did we get this note right?</p>
+                    <p class="rating-hint">
+                        Six-week check on whether Practice Chat is earning its place. One tap.
+                    </p>
+                    <div class="rating-scores" role="group" aria-label="Accuracy out of 5">
+                        <button type="button" class="rating-score" data-rating-action="score" data-rating-score="1" aria-label="1 out of 5">1</button>
+                        <button type="button" class="rating-score" data-rating-action="score" data-rating-score="2" aria-label="2 out of 5">2</button>
+                        <button type="button" class="rating-score" data-rating-action="score" data-rating-score="3" aria-label="3 out of 5">3</button>
+                        <button type="button" class="rating-score" data-rating-action="score" data-rating-score="4" aria-label="4 out of 5">4</button>
+                        <button type="button" class="rating-score" data-rating-action="score" data-rating-score="5" aria-label="5 out of 5">5</button>
+                    </div>
+                    <p class="rating-scale-legend">1 = wrong &middot; 5 = exactly right</p>
+                    <label class="rating-comment-label" for="ratingComment">Anything it got wrong? (optional)</label>
+                    <input id="ratingComment" class="rating-comment" type="text" maxlength="200" autocomplete="off" placeholder="e.g. heard the song title wrong">
+                    <div class="rating-actions">
+                        <button type="button" class="btn-link" data-rating-action="skip">Skip</button>
+                        <button type="button" class="btn-link rating-opt-out" data-rating-action="opt-out">Stop asking me</button>
+                    </div>
+                </div>
+
                 <!-- Secondary Actions -->
                 <div class="secondary-actions">
                     <button id="newBtn" class="btn-link">
@@ -191,7 +221,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20260807-song-checkbox-hints"></script>
+    <script type="module" src="/src/app.js?v=20260808-eval-telemetry"></script>
 
     <!-- Service Worker Registration -->
     <script>

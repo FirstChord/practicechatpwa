@@ -17,6 +17,16 @@ export function buildPracticeNoteId({ studentId = '', lessonDate = '', rawNoteTe
     return `practice_note:${studentId || 'unknown'}:${lessonDate || 'unknown'}:${stableHash(rawNoteText).slice(0, 12)}`;
 }
 
+// Absent must stay absent. `Number('')` is 0, so a missing priorNoteAgeDays
+// would otherwise arrive as "the previous note is from today" — a fact nobody
+// asserted, on every session that has no previous note at all.
+function positiveInt(value) {
+    const raw = clean(value);
+    if (!raw) return undefined;
+    const number = Number(raw);
+    return Number.isInteger(number) && number >= 0 ? number : undefined;
+}
+
 export function getPracticeChatContext(search = '') {
     const params = new URLSearchParams(search || '');
     return {
@@ -24,7 +34,19 @@ export function getPracticeChatContext(search = '') {
         studentName: clean(params.get('studentName')),
         tutor: clean(params.get('tutor')),
         practiceChatSecret: clean(params.get('practiceChatSecret')),
-        dashboardBaseUrl: clean(params.get('dashboardBaseUrl')).replace(/\/+$/u, '')
+        dashboardBaseUrl: clean(params.get('dashboardBaseUrl')).replace(/\/+$/u, ''),
+        // Six-week evaluation. The server decides who is prompted and how often
+        // — this app receives a yes/no and a rate, never the roster, for the
+        // same reason isLocalMmsWriteTestAvailable does not hold a tutor
+        // allow-list: a public app must not publish who is in a trial.
+        evalPrompt: params.get('evalPrompt') === '1',
+        evalSample: positiveInt(params.get('evalSample')) || 1,
+        // What the tutor had in front of them on the dashboard. `priorNoteExists`
+        // is availability, not evidence of reading — the dashboard renders the
+        // previous note automatically. Only `priorHistoryOpened` was a choice.
+        priorNoteExists: params.get('priorNoteExists') === '1',
+        priorNoteAgeDays: positiveInt(params.get('priorNoteAgeDays')),
+        priorHistoryOpened: params.get('priorHistoryOpened') === '1'
     };
 }
 
@@ -260,6 +282,45 @@ export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot
     }
 
     return payload;
+}
+
+/**
+ * Send session telemetry to the dashboard.
+ *
+ * Deliberately unlike `savePracticeNoteSnapshot`: that one throws so the caller
+ * can warn a tutor their note did not save. This one never throws and never
+ * reports. Measurement must not be able to interrupt, delay or fail a lesson,
+ * so a dead network here is silent by design — the missing rows show up as a
+ * gap in the evaluation, which is the correct place to feel it.
+ *
+ * `keepalive` lets the browser finish the request after the page goes away,
+ * which is what makes the final write survive a tutor closing the panel.
+ */
+export async function savePracticeChatSession({
+    dashboardBaseUrl = '',
+    payload = null,
+    practiceChatSecret = '',
+    keepalive = false,
+    fetchImpl = fetch
+} = {}) {
+    if (!dashboardBaseUrl || !payload?.sessionId || !payload?.studentId) {
+        return { skipped: true };
+    }
+
+    try {
+        const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-chat-sessions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+            },
+            body: JSON.stringify(payload),
+            keepalive
+        });
+        return { ok: response.ok, status: response.status };
+    } catch {
+        return { ok: false, skipped: true };
+    }
 }
 
 export function isLocalMmsWriteTestAvailable({ context = {}, hostname = window.location.hostname } = {}) {

@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260807-song-checkbox-hints';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260807-song-checkbox-hints';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260808-eval-telemetry';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260808-eval-telemetry';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteMmsTestWrite,
@@ -10,9 +10,28 @@ import {
     getPracticeChatContext,
     isLocalMmsWriteTestAvailable,
     previewPracticeNoteMmsTestWrite,
+    savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260807-song-checkbox-hints';
+} from './practice-note-sync.js?v=20260808-eval-telemetry';
+import {
+    buildSessionPayload,
+    createSession,
+    markPhase,
+    markStep,
+    measureEdit,
+    recordAsrError,
+    recordRating,
+    recordReRecord,
+    recordSafety,
+    recordSkip,
+    recordSongs,
+    recordingStarted,
+    recordingStopped,
+    shouldFlushOnHide,
+    shouldPromptForRating,
+    transcriptReceived
+} from './session-telemetry.js?v=20260808-eval-telemetry';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -20,9 +39,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260807-song-checkbox-hints';
+} from './note-markup.js?v=20260808-eval-telemetry';
 
-const PRACTICE_CHAT_BUILD = '20260807-song-checkbox-hints';
+const PRACTICE_CHAT_BUILD = '20260808-eval-telemetry';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -37,6 +56,12 @@ const QUESTION_LABELS = [
 ];
 
 const NOTE_PLACEHOLDER = 'Processed notes will appear here...';
+
+// So a tutor sees at most one rating card a day however many lessons they teach.
+const RATING_PROMPT_DATE_KEY = 'practiceChatRatingPromptedOn';
+// "Stop asking me" is permanent and honoured without argument. A prompt someone
+// has opted out of that reappears next week is worse than never asking.
+const RATING_OPT_OUT_KEY = 'practiceChatRatingOptOut';
 
 class PracticeChatApp {
     constructor() {
@@ -66,11 +91,77 @@ class PracticeChatApp {
         this.mmsWorkflowComplete = false;
         this.mmsExecuteButtonLabel = '';
 
+        // Six-week evaluation telemetry. Held in memory and sent three times as
+        // the session progresses; the note text it measures never travels with
+        // it. Only exists when the dashboard supplied context — a bookmarked or
+        // installed PWA records nothing at all.
+        this.session = this.context.studentId && this.context.dashboardBaseUrl
+            ? createSession({
+                context: this.context,
+                asrModel: this.asrModel,
+                buildVersion: PRACTICE_CHAT_BUILD
+            })
+            : null;
+        // The text the app produced, kept so an edit can be measured against it.
+        this.generatedNoteText = '';
+        // The phase the server has actually been told about.
+        this.sentPhase = '';
+
         this.initializeElements();
         this.bindEvents();
         this.updateQuestionDisplay();
         this.configureMmsTestPanel();
         this.loadTranscriptionPrompt();
+        this.sendSessionTelemetry();
+        this.bindSessionFlush();
+    }
+
+    /**
+     * Fire-and-forget. Never awaited by anything on the tutor's path, never
+     * throws, never shows an error: measuring the ritual must not be able to
+     * interrupt it. A failed send leaves a gap in the evaluation, which is the
+     * right place to feel it.
+     */
+    sendSessionTelemetry({ keepalive = false } = {}) {
+        if (!this.session) return;
+        try {
+            const payload = buildSessionPayload(this.session);
+            // Remember what the server has been told, so the flush below can
+            // tell "nothing new to say" from "the last thing never got sent".
+            this.sentPhase = payload.phase;
+            savePracticeChatSession({
+                dashboardBaseUrl: this.context.dashboardBaseUrl,
+                payload,
+                practiceChatSecret: this.context.practiceChatSecret,
+                keepalive
+            });
+        } catch (error) {
+            console.warn('Session telemetry skipped:', error);
+        }
+    }
+
+    /**
+     * A last write when the panel closes mid-ritual.
+     *
+     * Enrichment, not the signal. The dashboard already knows a session was
+     * abandoned from the phase it never reached; this only adds *where* it
+     * stopped. `pagehide` in an iframe is unreliable by nature, which is exactly
+     * why abandonment is never inferred from its absence.
+     */
+    bindSessionFlush() {
+        if (!this.session) return;
+        window.addEventListener('pagehide', () => {
+            // Flush whenever the server is behind, not merely when the ritual is
+            // unfinished. Those came apart in the rating case: `finishSession`
+            // sets phase to `finished` and then *holds* the send so the tutor's
+            // score can ride on the same row. A tutor who closed the panel
+            // without answering therefore left a completed lesson recorded as
+            // abandoned-at-review — and only ever for sampled sessions, so it
+            // would have quietly biased the completion rate against exactly the
+            // sessions carrying the ratings.
+            if (!shouldFlushOnHide({ sentPhase: this.sentPhase, phase: this.session.phase })) return;
+            this.sendSessionTelemetry({ keepalive: true });
+        });
     }
 
     /**
@@ -133,6 +224,10 @@ class PracticeChatApp {
         this.unlistedSongInput = document.getElementById('unlistedSongInput');
         this.addUnlistedSongBtn = document.getElementById('addUnlistedSongBtn');
         this.unlistedSongChoicesEl = document.getElementById('unlistedSongChoices');
+        // Evaluation rating card. Absent from the DOM for everyone not in the
+        // trial only in the sense that it stays hidden — the markup is inert.
+        this.ratingCard = document.getElementById('ratingCard');
+        this.ratingCommentInput = document.getElementById('ratingComment');
         this.mmsTestPanel = document.getElementById('mmsTestPanel');
         this.mmsExecuteBtn = document.getElementById('mmsExecuteBtn');
         this.mmsPreviewEl = document.getElementById('mmsPreview');
@@ -341,6 +436,17 @@ class PracticeChatApp {
                 this.addUnlistedSong();
             }
         });
+        // Delegated: the five score buttons, Skip and the opt-out all resolve to
+        // one answer, and only their data attributes differ.
+        this.ratingCard?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-rating-action]');
+            if (!button) return;
+            const action = button.dataset.ratingAction;
+            this.answerRating({
+                accuracy: action === 'score' ? Number(button.dataset.ratingScore) : '',
+                optOut: action === 'opt-out'
+            });
+        });
         if (this.mmsExecuteBtn) {
             this.mmsExecuteButtonLabel = this.mmsExecuteBtn.textContent;
             this.mmsExecuteBtn.addEventListener('click', () => this.executeMmsTestWrite());
@@ -534,6 +640,16 @@ class PracticeChatApp {
         this.outputSection.classList.add('show');
         this.showStatus('Type or paste the lesson notes, then check the lesson date.', 'info');
 
+        // The typed fallback. Recorded as its own outcome rather than as an
+        // abandoned recording: choosing to type is a workaround the tutor found,
+        // and how often it happens is one of the things worth knowing.
+        if (this.session) this.session.typedNotSpoken = true;
+        // The template is what the app produced, so an edit is measured against
+        // it — otherwise every typed note would read as "heavily edited".
+        this.generatedNoteText = this.buildTypedNoteTemplate();
+        markPhase(this.session, 'note_generated');
+        this.sendSessionTelemetry();
+
         if (isLocalMmsWriteTestAvailable({ context: this.context })) {
             this.previewMmsTestWrite();
         }
@@ -646,6 +762,7 @@ class PracticeChatApp {
             };
 
             this.asrClient.onError = (error) => {
+                recordAsrError(this.session, this.currentQuestionIndex);
                 this.showStatus(`Error: ${error.message}`, 'error');
                 this.isRecording = false;
                 this.updateMainButton('start', 'Start Recording', '🎤');
@@ -655,6 +772,7 @@ class PracticeChatApp {
             // Start recording
             await this.asrClient.start();
 
+            recordingStarted(this.session, this.currentQuestionIndex);
             this.isRecording = true;
             this.updateMainButton('stop', 'Stop Recording', '⏹️');
             this.skipBtn.disabled = true;
@@ -663,6 +781,9 @@ class PracticeChatApp {
 
         } catch (error) {
             console.error('Failed to start recording:', error);
+            // A microphone that will not open is a transcription failure the
+            // tutor experiences as one, even though nothing reached the model.
+            recordAsrError(this.session, this.currentQuestionIndex);
             this.showStatus(`Failed to start: ${error.message}`, 'error');
             this.isRecording = false;
             this.updateMainButton('start', 'Start Recording', '🎤');
@@ -676,6 +797,10 @@ class PracticeChatApp {
             this.showStatus('Processing... (this may take a few seconds)', 'info');
             this.mainActionBtn.disabled = true;
 
+            // Splits capture time from provider latency: a tutor talking for
+            // ninety seconds and OpenAI taking nine are different findings.
+            recordingStopped(this.session, this.currentQuestionIndex);
+
             // Stop recording and get transcript
             await this.asrClient.stop();
 
@@ -687,6 +812,7 @@ class PracticeChatApp {
 
         } catch (error) {
             console.error('Failed to process recording:', error);
+            recordAsrError(this.session, this.currentQuestionIndex);
             this.showStatus(`Processing failed: ${error.message}`, 'error');
             this.isRecording = false;
             this.updateMainButton('start', 'Start Recording', '🎤');
@@ -699,6 +825,9 @@ class PracticeChatApp {
     }
 
     processCurrentAnswer() {
+        // Length only — the transcript itself never leaves the browser.
+        transcriptReceived(this.session, this.currentQuestionIndex, this.currentTranscript);
+
         if (!this.currentTranscript.trim()) {
             this.showStatus('No answer recorded', 'warning');
             this.updateMainButton('start', 'Start Recording', '🎤');
@@ -729,9 +858,11 @@ class PracticeChatApp {
     }
 
     skipQuestion() {
+        recordSkip(this.session, this.currentQuestionIndex);
         this.questionAnswers[this.currentQuestionIndex] = '';
         if (this.currentQuestionIndex < 2) {
             this.currentQuestionIndex++;
+            markStep(this.session, this.currentQuestionIndex);
             this.updateQuestionDisplay();
         } else {
             this.finishRecording();
@@ -741,7 +872,11 @@ class PracticeChatApp {
     previousQuestion() {
         if (this.currentQuestionIndex > 0) {
             this.currentQuestionIndex--;
-            // Clear the previous answer to allow re-recording
+            // Going back clears the answer so it can be re-recorded. Counted as
+            // a correction, never as a failure — a tutor choosing to say it
+            // better is not the tool breaking.
+            recordReRecord(this.session, this.currentQuestionIndex);
+            markStep(this.session, this.currentQuestionIndex);
             this.questionAnswers[this.currentQuestionIndex] = '';
             this.updateQuestionDisplay();
         }
@@ -750,6 +885,7 @@ class PracticeChatApp {
     nextQuestion() {
         if (this.currentQuestionIndex < 2) {
             this.currentQuestionIndex++;
+            markStep(this.session, this.currentQuestionIndex);
             this.updateQuestionDisplay();
         }
     }
@@ -765,6 +901,10 @@ class PracticeChatApp {
         this.outputSection.classList.add('show');
 
         this.showStatus('Lesson notes complete!', 'success');
+
+        markPhase(this.session, 'note_generated');
+        this.sendSessionTelemetry();
+
         if (isLocalMmsWriteTestAvailable({ context: this.context })) {
             this.previewMmsTestWrite();
         }
@@ -796,6 +936,11 @@ class PracticeChatApp {
             console.warn('Practice Chat safety flag:', safety.findings);
             this.showStatus('One word may need a check before sending.', 'info');
         }
+        recordSafety(this.session, { flags: safety.ok ? 0 : safety.findings.length });
+
+        // The baseline an edit is measured against: what the app produced,
+        // before the tutor touched it.
+        this.generatedNoteText = output.trim();
 
         // Save to localStorage
         this.saveNotes(output.trim());
@@ -862,6 +1007,98 @@ class PracticeChatApp {
     }
 
 
+    /**
+     * The session reached an end. Captures what the tutor did to the note on
+     * the way, then offers the rating card if this tutor is in the evaluation.
+     *
+     * Called from both finishing paths — the legacy copy flow and the Level 2
+     * send — so "finished" means the same thing in the data whichever route a
+     * tutor's student is on.
+     */
+    finishSession(outcome, { noteId = '' } = {}) {
+        if (!this.session) return;
+
+        measureEdit(this.session, {
+            generated: this.generatedNoteText,
+            final: this.readNotePlainText()
+        });
+        recordSongs(this.session, {
+            songIds: this.getSelectedSongIds(),
+            unlistedTitles: this.unlistedSongTitles
+        });
+        this.session.outcome = outcome;
+        this.session.noteId = noteId;
+        markPhase(this.session, 'finished');
+
+        if (this.maybeShowRatingCard()) return;
+        this.sendSessionTelemetry();
+    }
+
+    /**
+     * Ask "did we get this note right?", if this tutor is in the evaluation and
+     * this session was sampled.
+     *
+     * Framed as a bug report about software, not an assessment of a person: the
+     * tutor is being asked whether the tool worked, which is a question they are
+     * uniquely able to answer and one they have every reason to want answered.
+     *
+     * Returns true when the card is showing, so the caller leaves the send to
+     * the answer handler and the rating lands on the same row.
+     */
+    maybeShowRatingCard() {
+        let lastPromptedOn = '';
+        try {
+            if (localStorage.getItem(RATING_OPT_OUT_KEY) === 'true') return false;
+            lastPromptedOn = localStorage.getItem(RATING_PROMPT_DATE_KEY) || '';
+        } catch {
+            // Private browsing. Fall through and let the sampling decide.
+        }
+
+        const show = shouldPromptForRating({
+            session: this.session,
+            evalPrompt: this.context.evalPrompt,
+            evalSample: this.context.evalSample,
+            lastPromptedOn
+        });
+        if (!show || !this.ratingCard) return false;
+
+        this.session.ratingPrompted = true;
+        try {
+            localStorage.setItem(RATING_PROMPT_DATE_KEY, new Date().toISOString().slice(0, 10));
+        } catch {
+            // Without storage a tutor may be asked more than once a day. An
+            // annoyance, not a reason to lose the answer.
+        }
+        this.ratingCard.hidden = false;
+        return true;
+    }
+
+    /**
+     * A score, or a skip. Both close the card and send.
+     *
+     * A skip is recorded rather than discarded: a prompt people decline is a
+     * finding about the prompt, and without it the response rate is unknowable.
+     */
+    answerRating({ accuracy = '', optOut = false } = {}) {
+        recordRating(this.session, {
+            accuracy,
+            comment: this.ratingCommentInput?.value || ''
+        });
+
+        if (optOut) {
+            try {
+                localStorage.setItem(RATING_OPT_OUT_KEY, 'true');
+            } catch {
+                // Nothing more we can do; the next session simply asks again.
+            }
+        }
+
+        if (this.ratingCard) {
+            this.ratingCard.hidden = true;
+        }
+        this.sendSessionTelemetry();
+    }
+
     async copyToClipboard() {
         const text = this.readNoteMarkup();
 
@@ -877,6 +1114,7 @@ class PracticeChatApp {
         try {
             await this.writeNoteToClipboard(text);
             const snapshot = await this.saveDashboardSnapshotForCurrentNote();
+            this.finishSession('saved_snapshot', { noteId: snapshot?.noteId || '' });
             if (!safety.ok) {
                 console.warn('Practice Chat safety flag:', safety.findings);
                 this.showStatus('Copied — one word may need a check before pasting.', 'info');
@@ -1352,12 +1590,16 @@ class PracticeChatApp {
         // Runs on the note as it stands now, including any tutor edits, and
         // before the send confirmation so wording gets fixed first.
         const safety = checkNoteSafety(noteText);
+        recordSafety(this.session, { flags: safety.ok ? 0 : safety.findings.length });
         if (!safety.ok) {
             const acknowledged = await this.confirmNoteSafety(safety.findings);
             if (!acknowledged) {
                 this.showStatus('Edit the note, then finish the lesson.', 'info');
                 return;
             }
+            // Whether the flag was a real mis-hearing or a false positive is the
+            // question; that the tutor confirmed it is the evidence.
+            recordSafety(this.session, { acknowledged: true });
         }
 
         const candidates = this.lastMmsPreview?.candidateAttendances || [];
@@ -1409,6 +1651,7 @@ class PracticeChatApp {
                 this.renderMmsAlreadyCompleted(result);
                 this.setMmsExecuteButtonComplete('Already done ✓');
                 finalButtonHandled = true;
+                this.finishSession('already_done', { noteId: result.practiceNoteLog?.noteId || '' });
                 this.notifyDashboardPracticeChatComplete({ result, status: 'already_completed' });
                 this.showStatus('Already done: no duplicate parent email was sent', 'success');
             } else if (result.emailNotes?.ok === false) {
@@ -1416,12 +1659,14 @@ class PracticeChatApp {
                 this.renderMmsPartialCompletion(result);
                 this.setMmsExecuteButtonWarning('Manual follow-up needed');
                 finalButtonHandled = true;
+                this.finishSession('manual_follow_up', { noteId: result.practiceNoteLog?.noteId || '' });
                 this.showStatus('Saved to dashboard and MMS. Email needs manual follow-up.', 'warning');
             } else if (result.practiceNoteLog?.ok === false) {
                 this.mmsWorkflowComplete = true;
                 this.renderMmsLogWarning(result);
                 this.setMmsExecuteButtonWarning('Dashboard log needs checking');
                 finalButtonHandled = true;
+                this.finishSession('manual_follow_up');
                 this.showStatus('Email sent and MMS updated, but the dashboard log needs checking.', 'warning');
             } else {
                 this.mmsWorkflowComplete = true;
@@ -1430,6 +1675,10 @@ class PracticeChatApp {
                     ? 'Absent marked ✓'
                     : 'Lesson done ✓');
                 finalButtonHandled = true;
+                this.finishSession(
+                    this.selectedMmsAttendanceStatus === 'AbsentNoMakeup' ? 'absent_no_makeup' : 'sent',
+                    { noteId: result.practiceNoteLog?.noteId || '' }
+                );
                 this.notifyDashboardPracticeChatComplete({
                     result,
                     status: this.selectedMmsAttendanceStatus === 'AbsentNoMakeup' ? 'absent_no_makeup' : 'completed'
@@ -1441,6 +1690,13 @@ class PracticeChatApp {
             }
         } catch (error) {
             console.error('MMS test write failed:', error);
+            // A hard failure the tutor has to resolve, not an abandonment. The
+            // session stays unfinished so the outcome does not claim a delivery
+            // that never happened, but the reason is recorded.
+            if (this.session) {
+                this.session.outcome = 'failed';
+                this.sendSessionTelemetry();
+            }
             this.showStatus(error.message || 'MMS test write failed', 'error');
         } finally {
             this.mmsTestInFlight = false;
