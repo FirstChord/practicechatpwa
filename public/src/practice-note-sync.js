@@ -378,6 +378,56 @@ async function callPracticeNoteMmsTestRoute({
     return payload;
 }
 
+// A shared lesson is delivered through its own route: one note, one attendance
+// write per student on the MMS event, and one email per household. The server
+// decides who shares a household and who carries the email — this app must never
+// make that call, because getting it wrong means a duplicate email to a parent.
+async function callPracticeNoteGroupRoute({
+    dashboardBaseUrl = '',
+    studentId = '',
+    noteText = '',
+    mode = 'dry_run',
+    targetAttendanceId = '',
+    attendanceStatus = 'Present',
+    noteSnapshot = null,
+    tutor = '',
+    practiceChatSecret = '',
+    fetchImpl = fetch
+} = {}) {
+    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/group`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        },
+        body: JSON.stringify({
+            studentMmsId: studentId,
+            noteText,
+            mode,
+            targetAttendanceId,
+            attendanceStatus,
+            noteSnapshot,
+            tutor,
+            confirmGroupDelivery: mode === 'execute'
+        })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || `Group lesson delivery failed (${response.status})`);
+    }
+
+    return payload;
+}
+
+export function previewPracticeNoteGroup(options = {}) {
+    return callPracticeNoteGroupRoute({ ...options, mode: 'dry_run' });
+}
+
+export function executePracticeNoteGroup(options = {}) {
+    return callPracticeNoteGroupRoute({ ...options, mode: 'execute' });
+}
+
 export function previewPracticeNoteMmsTestWrite(options = {}) {
     return callPracticeNoteMmsTestRoute({
         ...options,

@@ -1330,3 +1330,19 @@ body {
 .rating-opt-out {
     color: var(--text-light);
 }
+
+/* Shared lesson: the other students on the same MMS event. Sits under the date
+   confirmation because it answers the next question after "is this the right
+   lesson?" — "and is this everyone in it?" */
+.lesson-group {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.lesson-group-summary {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    opacity: 0.8;
+}

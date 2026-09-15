@@ -4,15 +4,17 @@ import test from 'node:test';
 import {
   buildPracticeNoteId,
   buildPracticeNoteSnapshot,
+  executePracticeNoteGroup,
   executePracticeNoteMmsTestWrite,
   fetchPracticeChatMusicContext,
   getPracticeChatContext,
   isLocalMmsWriteTestAvailable,
+  previewPracticeNoteGroup,
   previewPracticeNoteMmsTestWrite,
   savePracticeChatSession,
   savePracticeNoteSnapshot,
   splitStructuredNoteText,
-  suggestPracticeNoteSongs,
+  suggestPracticeNoteSongs
 } from '../public/src/practice-note-sync.js';
 
 test('getPracticeChatContext reads dashboard handoff query params', () => {
@@ -420,4 +422,60 @@ test('executePracticeNoteMmsTestWrite posts explicit confirmed target', async ()
     confirmRecipient: false,
     confirmedRecipientEmail: '',
   });
+});
+
+test('the group route asks the server, and never decides households itself', async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+        calls.push({ url, body: JSON.parse(init.body) });
+        return { ok: true, json: async () => ({ isGroup: true, summary: 'Athena and Sophia will be marked present.' }) };
+    };
+
+    const preview = await previewPracticeNoteGroup({
+        dashboardBaseUrl: 'https://dash.example',
+        studentId: 'sdt_M3RnJG',
+        noteText: 'Worked on scales.',
+        targetAttendanceId: 'atn_a',
+        tutor: 'Matthew',
+        practiceChatSecret: 'shh',
+        fetchImpl
+    });
+
+    assert.equal(preview.isGroup, true);
+    assert.equal(calls[0].url, 'https://dash.example/api/practice-notes/group');
+    assert.equal(calls[0].body.mode, 'dry_run');
+    // A dry run must never carry the execute confirmation.
+    assert.equal(calls[0].body.confirmGroupDelivery, false);
+    assert.equal(calls[0].body.studentMmsId, 'sdt_M3RnJG');
+    // No recipient or household field is sent: the server owns that decision,
+    // because getting it wrong means a duplicate email to a parent.
+    assert.equal('recipients' in calls[0].body, false);
+    assert.equal('confirmedRecipientEmail' in calls[0].body, false);
+});
+
+test('executing a group delivery sets the explicit group confirmation', async () => {
+    let sent = null;
+    const fetchImpl = async (url, init) => {
+        sent = JSON.parse(init.body);
+        return { ok: true, json: async () => ({ status: 'completed' }) };
+    };
+
+    await executePracticeNoteGroup({
+        dashboardBaseUrl: 'https://dash.example',
+        studentId: 'sdt_M3RnJG',
+        noteText: 'Worked on scales.',
+        targetAttendanceId: 'atn_a',
+        fetchImpl
+    });
+
+    assert.equal(sent.mode, 'execute');
+    assert.equal(sent.confirmGroupDelivery, true);
+});
+
+test('a failing group route surfaces the server message', async () => {
+    const fetchImpl = async () => ({ ok: false, status: 403, json: async () => ({ error: 'Tutor not enabled' }) });
+    await assert.rejects(
+        () => previewPracticeNoteGroup({ dashboardBaseUrl: 'https://dash.example', studentId: 'sdt_1', fetchImpl }),
+        /Tutor not enabled/u
+    );
 });

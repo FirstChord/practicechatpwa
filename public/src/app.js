@@ -1,19 +1,21 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260808-eval-telemetry';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260808-eval-telemetry';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260915-group-lessons';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260915-group-lessons';
 import {
     buildPracticeNoteSnapshot,
+    executePracticeNoteGroup,
     executePracticeNoteMmsTestWrite,
     fetchPracticeChatMusicContext,
     getPracticeChatContext,
     isLocalMmsWriteTestAvailable,
+    previewPracticeNoteGroup,
     previewPracticeNoteMmsTestWrite,
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260808-eval-telemetry';
+} from './practice-note-sync.js?v=20260915-group-lessons';
 import {
     buildSessionPayload,
     createSession,
@@ -31,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20260808-eval-telemetry';
+} from './session-telemetry.js?v=20260915-group-lessons';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -39,9 +41,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260808-eval-telemetry';
+} from './note-markup.js?v=20260915-group-lessons';
 
-const PRACTICE_CHAT_BUILD = '20260808-eval-telemetry';
+const PRACTICE_CHAT_BUILD = '20260915-group-lessons';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -87,6 +89,9 @@ class PracticeChatApp {
         this.lastMmsPreview = null;
         this.selectedMmsAttendanceId = '';
         this.selectedMmsAttendanceStatus = 'Present';
+        // Who else is in this lesson, answered by the server from the MMS event.
+        this.lessonGroup = null;
+        this.groupDeliveryChosen = true;
         this.mmsDateConfirmed = false;
         this.mmsWorkflowComplete = false;
         this.mmsExecuteButtonLabel = '';
@@ -605,6 +610,9 @@ class PracticeChatApp {
         this.lastMmsPreview = null;
         this.selectedMmsAttendanceId = '';
         this.selectedMmsAttendanceStatus = 'Present';
+        // Who else is in this lesson, answered by the server from the MMS event.
+        this.lessonGroup = null;
+        this.groupDeliveryChosen = true;
         this.mmsDateConfirmed = false;
         this.mmsWorkflowComplete = false;
         this.attendanceStatusInputs.forEach((input) => {
@@ -1486,7 +1494,7 @@ class PracticeChatApp {
         this.mmsExecuteBtn.disabled = true;
     }
 
-    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present', recipientName = '', recipientEmail = '' } = {}) {
+    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present', recipientName = '', recipientEmail = '', groupSummary = '' } = {}) {
         const student = studentName || this.context.studentName || 'this student';
         const date = targetDate || 'the selected lesson';
         const isAbsentNoMakeup = attendanceStatus === 'AbsentNoMakeup';
@@ -1506,6 +1514,7 @@ class PracticeChatApp {
                             ? '<li>Mark attendance AbsentNoMakeup in MMS</li><li>Do not email practice notes</li><li>Keep this as an attendance-only record</li>'
                             : `<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email these notes to ${this.escapeHtml(recipientName || 'the selected parent')} (${this.escapeHtml(recipientEmail || 'no email found')})</li>`}
                     </ul>
+                    ${groupSummary ? `<p class="action-confirm-copy lesson-group-summary">${this.escapeHtml(groupSummary)}</p>` : ''}
                     ${isAbsentNoMakeup ? '' : `<label class="date-confirmation action-confirm-check"><input id="sendRecipientConfirm" type="checkbox"><span>I confirm these are ${this.escapeHtml(student)}’s notes and they should be emailed to this parent.</span></label>`}
                     <div class="action-confirm-actions">
                         <button type="button" class="btn action-confirm-secondary" data-confirm="cancel">Go back</button>
@@ -1564,6 +1573,9 @@ class PracticeChatApp {
             this.mmsDateConfirmed = false;
             this.renderMmsPreview(preview);
             this.showStatus('Suggested lesson found. Tick the date if it is correct.', 'success');
+            // Asked after the preview renders, so a slow or failing group lookup
+            // never delays or breaks the ordinary one-student flow.
+            await this.loadLessonGroup(noteText);
         } catch (error) {
             console.error('MMS test preview failed:', error);
             this.showStatus(error.message || 'MMS test preview failed', 'error');
@@ -1571,6 +1583,126 @@ class PracticeChatApp {
             this.mmsTestInFlight = false;
             this.updateMmsExecuteState();
         }
+    }
+
+    async loadLessonGroup(noteText = '') {
+        this.lessonGroup = null;
+        if (!this.selectedMmsAttendanceId) return;
+        try {
+            const group = await previewPracticeNoteGroup({
+                dashboardBaseUrl: this.context.dashboardBaseUrl,
+                studentId: this.context.studentId,
+                noteText,
+                targetAttendanceId: this.selectedMmsAttendanceId,
+                attendanceStatus: this.selectedMmsAttendanceStatus,
+                tutor: this.context.tutor,
+                practiceChatSecret: this.context.practiceChatSecret
+            });
+            if (!group?.isGroup) return;
+            this.lessonGroup = group;
+            this.groupDeliveryChosen = true;
+            this.renderLessonGroup(group);
+        } catch (error) {
+            // A group lookup failure is not a reason to block the lesson. The
+            // tutor finishes the student they opened, exactly as before.
+            console.warn('Lesson group lookup failed:', error);
+        }
+    }
+
+    renderLessonGroup(group) {
+        if (!this.mmsPreviewEl || !group?.isGroup) return;
+        const others = (group.group?.plan || []).filter((entry) => !entry.isLead);
+        if (!others.length) return;
+
+        const names = others.map((entry) => this.escapeHtml(entry.studentName)).join(', ');
+        const block = document.createElement('div');
+        block.className = 'lesson-group';
+        block.innerHTML = `
+            <label class="date-confirmation">
+                <input id="groupDeliveryToggle" type="checkbox" checked>
+                <span>Also finish ${names}</span>
+            </label>
+            <div class="lesson-group-summary">${this.escapeHtml(group.summary || '')}</div>
+        `;
+        this.mmsPreviewEl.appendChild(block);
+
+        const toggle = block.querySelector('#groupDeliveryToggle');
+        toggle?.addEventListener('change', (event) => {
+            this.groupDeliveryChosen = Boolean(event.target.checked);
+            this.updateMmsExecuteButtonLabel();
+        });
+        this.updateMmsExecuteButtonLabel();
+    }
+
+    isGroupDelivery() {
+        return Boolean(this.lessonGroup?.isGroup && this.groupDeliveryChosen);
+    }
+
+    async executeGroupWrite(noteText) {
+        this.mmsTestInFlight = true;
+        this.setMmsExecuteButtonBusy(true);
+        this.renderMmsSavingState(this.formatMmsLessonDate(this.lastMmsPreview?.targetAttendance?.eventStartDate));
+        try {
+            const result = await executePracticeNoteGroup({
+                dashboardBaseUrl: this.context.dashboardBaseUrl,
+                studentId: this.context.studentId,
+                noteText,
+                targetAttendanceId: this.selectedMmsAttendanceId,
+                attendanceStatus: this.selectedMmsAttendanceStatus,
+                noteSnapshot: buildPracticeNoteSnapshot({
+                    context: this.context,
+                    rawNoteText: noteText,
+                    songIds: this.getSelectedSongIds(),
+                    unlistedSongTitles: this.unlistedSongTitles
+                }),
+                tutor: this.context.tutor,
+                practiceChatSecret: this.context.practiceChatSecret
+            });
+
+            this.renderGroupCompletion(result);
+            this.mmsWorkflowComplete = result.status === 'completed';
+            if (result.status === 'completed') {
+                this.setMmsExecuteButtonComplete('Lesson done ✓');
+                this.notifyDashboardPracticeChatComplete({ result, status: 'completed' });
+            } else {
+                // Partial is its own state: one sister marked and the other not
+                // must never read as done.
+                this.setMmsExecuteButtonWarning('Needs follow-up');
+                this.showStatus(result.message || 'Some students still need sorting.', 'warning');
+            }
+            return true;
+        } catch (error) {
+            console.error('Group lesson delivery failed:', error);
+            this.showStatus(error.message || 'Group lesson delivery failed', 'error');
+            this.setMmsExecuteButtonBusy(false);
+            return false;
+        } finally {
+            this.mmsTestInFlight = false;
+        }
+    }
+
+    renderGroupCompletion(result) {
+        if (!this.mmsPreviewEl) return;
+        const rows = (result.results || []).map((entry) => {
+            const mark = entry.attendanceSaved ? '✓' : '✗';
+            const email = entry.emailSent
+                ? ' · email sent'
+                : entry.emailReason === 'covered_by_group_email'
+                    ? ' · included in the group email'
+                    : entry.emailReason === 'attendance_only_lesson'
+                        ? ''
+                        : entry.error
+                            ? ` · ${this.escapeHtml(entry.error)}`
+                            : '';
+            return `<li>${mark} ${this.escapeHtml(entry.studentName)}${email}</li>`;
+        }).join('');
+
+        this.mmsPreviewEl.innerHTML = `
+            <div class="completion-title">${result.status === 'completed' ? 'Done' : 'Partly done'}</div>
+            <ul class="completion-list">${rows}</ul>
+            <div class="lesson-group-summary">${this.escapeHtml(result.message || '')}</div>
+        `;
+        this.mmsPreviewEl.style.display = 'block';
     }
 
     async executeMmsTestWrite() {
@@ -1605,14 +1737,26 @@ class PracticeChatApp {
         const candidates = this.lastMmsPreview?.candidateAttendances || [];
         const selectedCandidate = candidates.find((candidate) => candidate.attendanceId === targetAttendanceId) || this.lastMmsPreview?.targetAttendance || {};
         const targetDate = this.formatMmsLessonDate(selectedCandidate.eventStartDate);
+        const groupDelivery = this.isGroupDelivery();
         const confirmed = await this.confirmLessonFinish({
-            studentName: this.context.studentName,
+            studentName: groupDelivery
+                ? (this.lessonGroup.group?.plan || []).map((entry) => entry.studentName).join(' and ')
+                : this.context.studentName,
             targetDate,
             attendanceStatus: this.selectedMmsAttendanceStatus,
             recipientName: this.lastMmsPreview?.recipients?.[0]?.name || '',
             recipientEmail: this.lastMmsPreview?.recipients?.[0]?.email || '',
+            groupSummary: groupDelivery ? this.lessonGroup.summary : '',
         });
         if (!confirmed) {
+            return;
+        }
+
+        // One note, every student on the lesson, one email per household. The
+        // server owns the household grouping; this only decides whether the
+        // tutor asked for the whole lesson or just the student they opened.
+        if (groupDelivery) {
+            await this.executeGroupWrite(noteText);
             return;
         }
 
