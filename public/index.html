@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css?v=20260915-group-lessons">
+    <link rel="stylesheet" href="/css/styles.css?v=20260915-subtraction-pass">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -145,24 +145,25 @@
                     Copy Notes
                 </button>
 
-                <!-- Attendance Reminder -->
+                <!--
+                    Shown only when Practice Chat was opened without dashboard
+                    context — a bookmark rather than the quick link — where the
+                    copy button becomes "Take Attendance" and the tutor finishes
+                    in MMS itself. Not dead: it is the whole instruction for that
+                    path.
+                -->
                 <div id="attendanceReminder" class="attendance-reminder" style="display: none;">
                     <p>👆 Click above to mark attendance on MyMusicStaff</p>
                 </div>
 
+                <!--
+                    No heading and no "next steps" list. This panel used to
+                    introduce itself as a pilot and then narrate the three
+                    controls directly beneath it; the controls say it better
+                    than the prose did, and it stopped being a pilot a while
+                    ago. What survives is the affordance itself.
+                -->
                 <div id="mmsTestPanel" class="mms-test-panel" style="display: none;">
-                    <div class="mms-test-copy">
-                        <strong>Lesson admin pilot</strong>
-                        <span>Use this flow to finish the lesson notes from this screen.</span>
-                    </div>
-                    <div class="mms-test-checklist">
-                        <span>Next steps:</span>
-                        <ul>
-                            <li>Edit the notes above until they are ready</li>
-                            <li>Tick the lesson date once it is correct</li>
-                            <li>Click the final button to save attendance and finish the lesson admin</li>
-                        </ul>
-                    </div>
                     <fieldset class="attendance-choice" aria-label="Attendance status">
                         <legend>Attendance</legend>
                         <label>
@@ -221,7 +222,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20260915-group-lessons"></script>
+    <script type="module" src="/src/app.js?v=20260915-subtraction-pass"></script>
 
     <!-- Service Worker Registration -->
     <script>

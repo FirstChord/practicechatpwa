@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260915-group-lessons';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260915-group-lessons';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260915-subtraction-pass';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260915-subtraction-pass';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260915-group-lessons';
+} from './practice-note-sync.js?v=20260915-subtraction-pass';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20260915-group-lessons';
+} from './session-telemetry.js?v=20260915-subtraction-pass';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,9 +41,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260915-group-lessons';
+} from './note-markup.js?v=20260915-subtraction-pass';
 
-const PRACTICE_CHAT_BUILD = '20260915-group-lessons';
+const PRACTICE_CHAT_BUILD = '20260915-subtraction-pass';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -1134,7 +1134,12 @@ class PracticeChatApp {
             }
 
             if (!isLocalMmsWriteTestAvailable({ context: this.context })) {
-                // Legacy/fallback flow for normal use outside the local Test Studenty pilot.
+                // No dashboard context: Practice Chat was opened from a bookmark
+                // rather than the dashboard quick link, so there is no student to
+                // write attendance for. The tutor copies the note and finishes in
+                // MMS by hand. (The old comment called this the "Test Studenty
+                // pilot" fallback, which stopped being true when Level 2 reached
+                // real tutors.)
                 this.copyBtn.innerHTML = '<span class="btn-icon">✅</span>Take Attendance';
                 this.copyBtn.onclick = () => this.takeAttendance();
             }

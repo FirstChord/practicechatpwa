@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v28-group-lessons';
+const CACHE_NAME = 'practice-chat-v29-subtraction-pass';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20260915-group-lessons',
-  '/src/app.js?v=20260915-group-lessons',
-  '/src/practice-note-sync.js?v=20260915-group-lessons',
-  '/src/note-markup.js?v=20260915-group-lessons',
+  '/css/styles.css?v=20260915-subtraction-pass',
+  '/src/app.js?v=20260915-subtraction-pass',
+  '/src/practice-note-sync.js?v=20260915-subtraction-pass',
+  '/src/note-markup.js?v=20260915-subtraction-pass',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'

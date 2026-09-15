@@ -417,39 +417,11 @@ body {
     margin-top: 16px;
 }
 
-.mms-test-copy {
-    display: grid;
-    gap: 4px;
-    color: var(--text-dark);
-    font-size: 14px;
-    line-height: 1.45;
-}
 
-.mms-test-copy span {
-    color: var(--text-light);
-}
 
-.mms-test-checklist {
-    margin-top: 12px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.72);
-    padding: 12px;
-    color: var(--text-dark);
-    font-size: 13px;
-}
 
-.mms-test-checklist span {
-    font-weight: 700;
-}
 
-.mms-test-checklist ul {
-    margin: 8px 0 0;
-    padding-left: 18px;
-}
 
-.mms-test-checklist li {
-    margin: 3px 0;
-}
 
 .attendance-choice {
     display: grid;

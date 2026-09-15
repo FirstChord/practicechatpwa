@@ -1,5 +1,4 @@
 const DEFAULT_SOURCE = 'practice_chat_pwa';
-export const TEST_MMS_WRITE_STUDENT_ID = 'sdt_fBg9JN';
 
 function clean(value = '') {
     return `${value || ''}`.trim();
