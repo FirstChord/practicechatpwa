@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260915-subtraction-pass';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260915-subtraction-pass';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20260917-two-parent-households';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20260917-two-parent-households';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20260915-subtraction-pass';
+} from './practice-note-sync.js?v=20260917-two-parent-households';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20260915-subtraction-pass';
+} from './session-telemetry.js?v=20260917-two-parent-households';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,9 +41,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20260915-subtraction-pass';
+} from './note-markup.js?v=20260917-two-parent-households';
 
-const PRACTICE_CHAT_BUILD = '20260915-subtraction-pass';
+const PRACTICE_CHAT_BUILD = '20260917-two-parent-households';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
@@ -1276,6 +1276,11 @@ class PracticeChatApp {
         const recipient = preview.recipients?.[0] || {};
         const recipientEmail = recipient.email || 'None';
         const recipientName = recipient.name || 'Parent';
+        // Households with more than one parent on the MMS record (separated
+        // parents, two carers). They are Bcc'd on the same send, so the tutor
+        // must be able to see them before confirming — a silent copy is not a
+        // confirmed one.
+        const copiedTo = (preview.recipients || []).slice(1).filter((entry) => entry?.email);
         const selectionLabel = selectedCandidate.attendanceId !== target.attendanceId
             ? 'You selected this lesson from the date list.'
             : preview.targetSelection?.label || 'Selected from recent lessons found for this student.';
@@ -1292,7 +1297,8 @@ class PracticeChatApp {
             <div><strong>Current MMS status:</strong> ${this.escapeHtml(selectedCandidate.attendanceStatus || 'Unknown')}</div>
             ${isAbsentNoMakeup
                 ? '<div class="absence-note"><strong>Absent:</strong> This will mark the student AbsentNoMakeup in MMS and will not email practice notes.</div>'
-                : `<div><strong>Email will go to:</strong> ${this.escapeHtml(recipientName)} · ${this.escapeHtml(recipientEmail)}</div>`}
+                : `<div><strong>Email will go to:</strong> ${this.escapeHtml(recipientName)} · ${this.escapeHtml(recipientEmail)}</div>
+                   ${copiedTo.length ? `<div><strong>Also copied (Bcc):</strong> ${copiedTo.map((entry) => this.escapeHtml(entry.name || entry.email)).join(', ')}</div>` : ''}`}
             <label class="date-select-label" for="mmsAttendanceSelect">Wrong date?</label>
             <select id="mmsAttendanceSelect" class="date-select">
                 ${candidateOptions}
@@ -1499,7 +1505,7 @@ class PracticeChatApp {
         this.mmsExecuteBtn.disabled = true;
     }
 
-    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present', recipientName = '', recipientEmail = '', groupSummary = '' } = {}) {
+    confirmLessonFinish({ studentName = '', targetDate = '', attendanceStatus = 'Present', recipientName = '', recipientEmail = '', copiedTo = [], groupSummary = '' } = {}) {
         const student = studentName || this.context.studentName || 'this student';
         const date = targetDate || 'the selected lesson';
         const isAbsentNoMakeup = attendanceStatus === 'AbsentNoMakeup';
@@ -1517,7 +1523,7 @@ class PracticeChatApp {
                     <ul class="action-confirm-list">
                         ${isAbsentNoMakeup
                             ? '<li>Mark attendance AbsentNoMakeup in MMS</li><li>Do not email practice notes</li><li>Keep this as an attendance-only record</li>'
-                            : `<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email these notes to ${this.escapeHtml(recipientName || 'the selected parent')} (${this.escapeHtml(recipientEmail || 'no email found')})</li>`}
+                            : `<li>Save the note to the dashboard</li><li>Mark attendance Present in MMS</li><li>Email these notes to ${this.escapeHtml(recipientName || 'the selected parent')} (${this.escapeHtml(recipientEmail || 'no email found')})</li>${copiedTo.length ? `<li>Copy in ${this.escapeHtml(copiedTo.map((entry) => entry.name || entry.email).join(', '))} (Bcc — they will not see each other’s address)</li>` : ''}`}
                     </ul>
                     ${groupSummary ? `<p class="action-confirm-copy lesson-group-summary">${this.escapeHtml(groupSummary)}</p>` : ''}
                     ${isAbsentNoMakeup ? '' : `<label class="date-confirmation action-confirm-check"><input id="sendRecipientConfirm" type="checkbox"><span>I confirm these are ${this.escapeHtml(student)}’s notes and they should be emailed to this parent.</span></label>`}
@@ -1751,6 +1757,7 @@ class PracticeChatApp {
             attendanceStatus: this.selectedMmsAttendanceStatus,
             recipientName: this.lastMmsPreview?.recipients?.[0]?.name || '',
             recipientEmail: this.lastMmsPreview?.recipients?.[0]?.email || '',
+            copiedTo: (this.lastMmsPreview?.recipients || []).slice(1).filter((entry) => entry?.email),
             groupSummary: groupDelivery ? this.lessonGroup.summary : '',
         });
         if (!confirmed) {
