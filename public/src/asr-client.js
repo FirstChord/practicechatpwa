@@ -1,7 +1,7 @@
 // Practice Chat - ASR Client Module
-// Handles speech recognition via Whisper API (batch processing)
-
-const RELAY_SERVER = 'https://enhanced-music-lesson-notes-production.up.railway.app';
+// Records the answer, then sends the audio to the dashboard, which calls OpenAI
+// server-side and returns only the text. The browser never holds an API key:
+// it used to fetch the raw key from the relay's /api-key and call OpenAI itself.
 
 // The transcription model, in one place so the value is always the model that
 // actually produced the text.
@@ -62,11 +62,48 @@ function getRandomProcessingMessage() {
     return PROCESSING_MESSAGES[Math.floor(Math.random() * PROCESSING_MESSAGES.length)];
 }
 
+// Opened from a bookmark there is no dashboard to transcribe through. Said
+// before recording starts, so nobody talks for two minutes into a dead end.
+export const NO_DASHBOARD_MESSAGE = 'Voice notes need Practice Chat opened from the dashboard. Use “Type notes instead”.';
+
 /**
- * Whisper ASR Client - Records audio and sends to Whisper API for transcription
+ * POST recorded audio to the dashboard's transcription route; resolve to text.
+ */
+export async function transcribeViaDashboard({
+    dashboardBaseUrl = '',
+    practiceChatSecret = '',
+    audioBlob,
+    model = DEFAULT_ASR_MODEL,
+    prompt = '',
+    fetchImpl = fetch
+} = {}) {
+    if (!dashboardBaseUrl) throw new Error(NO_DASHBOARD_MESSAGE);
+
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', model);
+    if (prompt) formData.append('prompt', prompt);
+
+    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/transcribe`, {
+        method: 'POST',
+        headers: {
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        },
+        body: formData
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || `Transcription failed (${response.status})`);
+    }
+    return `${payload.text || ''}`.trim();
+}
+
+/**
+ * Whisper ASR Client - Records audio and sends it to the dashboard for transcription
  */
 export class WhisperASRClient {
-    constructor({ model = DEFAULT_ASR_MODEL, prompt = '' } = {}) {
+    constructor({ model = DEFAULT_ASR_MODEL, prompt = '', dashboardBaseUrl = '', practiceChatSecret = '' } = {}) {
         this.mediaStream = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
@@ -74,6 +111,8 @@ export class WhisperASRClient {
         this.model = model;
         // Tells the model which songs and terms to expect. Empty is fine.
         this.prompt = prompt;
+        this.dashboardBaseUrl = dashboardBaseUrl;
+        this.practiceChatSecret = practiceChatSecret;
 
         // Callbacks
         this.onPartialTranscript = null;
@@ -82,6 +121,11 @@ export class WhisperASRClient {
     }
 
     async start() {
+        if (!this.dashboardBaseUrl) {
+            const error = new Error(NO_DASHBOARD_MESSAGE);
+            if (this.onError) this.onError(error);
+            throw error;
+        }
         try {
             console.log('🎤 Starting Whisper ASR recording...');
 
@@ -185,67 +229,19 @@ export class WhisperASRClient {
 
     async transcribeAudio(audioBlob) {
         try {
-            console.log('📤 Sending audio to Whisper API...');
-
-            // Get API key from relay server
-            const apiKey = await this.getAPIKey();
-
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('file', audioBlob, 'audio.webm');
-            formData.append('model', this.model);
-            formData.append('response_format', 'json');
-            if (this.prompt) {
-                formData.append('prompt', this.prompt);
-            }
-
-            // Send to Whisper API
-            const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: formData
+            console.log('📤 Sending audio for transcription...');
+            const text = await transcribeViaDashboard({
+                dashboardBaseUrl: this.dashboardBaseUrl,
+                practiceChatSecret: this.practiceChatSecret,
+                audioBlob,
+                model: this.model,
+                prompt: this.prompt
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Whisper API error: ${response.status} - ${errorText}`);
-            }
-
-            const result = await response.json();
-            console.log('✅ Whisper transcription completed:', result.text);
-
-            return result.text.trim();
-
+            console.log('✅ Transcription completed');
+            return text;
         } catch (error) {
-            console.error('❌ Whisper API error:', error);
+            console.error('❌ Transcription error:', error);
             throw new Error(`Transcription failed: ${error.message}`);
-        }
-    }
-
-    async getAPIKey() {
-        try {
-            console.log('🔑 Fetching API key from relay server...');
-
-            const response = await fetch(`${RELAY_SERVER}/api-key`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to get API key: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('✅ API key retrieved');
-            return data.apiKey;
-
-        } catch (error) {
-            console.error('❌ Failed to get API key:', error);
-            throw new Error('Could not retrieve API key for Whisper transcription');
         }
     }
 

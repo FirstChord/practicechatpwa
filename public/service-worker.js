@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v30-two-parent-households';
+const CACHE_NAME = 'practice-chat-v31-server-transcription';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20260917-two-parent-households',
-  '/src/app.js?v=20260917-two-parent-households',
-  '/src/practice-note-sync.js?v=20260917-two-parent-households',
-  '/src/note-markup.js?v=20260917-two-parent-households',
+  '/css/styles.css?v=20261006-server-transcription',
+  '/src/app.js?v=20261006-server-transcription',
+  '/src/practice-note-sync.js?v=20261006-server-transcription',
+  '/src/note-markup.js?v=20261006-server-transcription',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
