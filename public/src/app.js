@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261007-wording-check';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261007-wording-check';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261007-practice-plan';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261007-practice-plan';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261007-wording-check';
+} from './practice-note-sync.js?v=20261007-practice-plan';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261007-wording-check';
+} from './session-telemetry.js?v=20261007-practice-plan';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,14 +41,16 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261007-wording-check';
+} from './note-markup.js?v=20261007-practice-plan';
 
-const PRACTICE_CHAT_BUILD = '20261007-wording-check';
+const PRACTICE_CHAT_BUILD = '20261007-practice-plan';
 
 const QUESTIONS = [
     "What did we do in the lesson?",
     "What went well or what was challenging?",
-    "What would be good practice over the week? (and how!)"
+    // How, when and where: a plan with a time and place is followed through far
+    // more often than a goal alone (implementation intentions, d≈0.65).
+    "What will you practise this week, and how, when and where?"
 ];
 
 const QUESTION_LABELS = [
@@ -988,7 +990,7 @@ class PracticeChatApp {
             ? `Notes are emailed home. If a student has told you something worrying,
                take it out of the note and tell Finn, our safeguarding lead, instead.`
             : `Speech recognition sometimes mishears music words. ${hint}
-               Nothing has been changed for you — read the note through and
+               Nothing has been changed for you. Read the note through and
                edit it if it is wrong.`;
 
         return new Promise((resolve) => {
