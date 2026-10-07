@@ -301,7 +301,7 @@ practice-chat/
 2. Bump the `?v=` stamp everywhere and `CACHE_NAME` in `service-worker.js`
 3. Run tests: `npm test`
 4. Test locally: `python3 -m http.server 8000 --directory public`
-5. Deploy: commit and `git push` — `.github/workflows/firebase-hosting-main.yml`
+5. Deploy: commit and `git push`. `.github/workflows/firebase-hosting-main.yml`
    runs the tests and deploys only if they pass. A manual
    `firebase deploy --only hosting` also runs the tests first (predeploy hook),
    but leaves GitHub behind what is live; between August and October 2026 that

@@ -142,7 +142,7 @@ const RISKY_OUTPUT_TERMS = [
   { pattern: /\bmolest\w*\b/gi, likelyMeant: '' },
 
   // Possible safeguarding disclosures. These belong with the safeguarding lead,
-  // not in an email home — the reviewer may be the only person who sees it.
+  // not in an email home: the reviewer may be the only person who sees it.
   { pattern: /\bsuicid\w*\b/gi, likelyMeant: '', category: 'safeguarding' },
   { pattern: /\bself[- ]?harm\w*\b/gi, likelyMeant: '', category: 'safeguarding' },
   { pattern: /\b(kill|hurt|cut|cutting|harm)\s+(myself|himself|herself|themselves|themself)\b/gi, likelyMeant: '', category: 'safeguarding' },
