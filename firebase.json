@@ -2,6 +2,9 @@
   "hosting": {
     "site": "practice-chat-pwa",
     "public": "public",
+    "predeploy": [
+      "npm test"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

@@ -433,7 +433,7 @@ test('the group route asks the server, and never decides households itself', asy
 
     const preview = await previewPracticeNoteGroup({
         dashboardBaseUrl: 'https://dash.example',
-        studentId: 'sdt_M3RnJG',
+        studentId: 'sdt_TEST01',
         noteText: 'Worked on scales.',
         targetAttendanceId: 'atn_a',
         tutor: 'Matthew',
@@ -446,7 +446,7 @@ test('the group route asks the server, and never decides households itself', asy
     assert.equal(calls[0].body.mode, 'dry_run');
     // A dry run must never carry the execute confirmation.
     assert.equal(calls[0].body.confirmGroupDelivery, false);
-    assert.equal(calls[0].body.studentMmsId, 'sdt_M3RnJG');
+    assert.equal(calls[0].body.studentMmsId, 'sdt_TEST01');
     // No recipient or household field is sent: the server owns that decision,
     // because getting it wrong means a duplicate email to a parent.
     assert.equal('recipients' in calls[0].body, false);
@@ -462,7 +462,7 @@ test('executing a group delivery sets the explicit group confirmation', async ()
 
     await executePracticeNoteGroup({
         dashboardBaseUrl: 'https://dash.example',
-        studentId: 'sdt_M3RnJG',
+        studentId: 'sdt_TEST01',
         noteText: 'Worked on scales.',
         targetAttendanceId: 'atn_a',
         fetchImpl
