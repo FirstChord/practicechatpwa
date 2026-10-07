@@ -86,13 +86,14 @@ const STUTTER_WORDS = [
  * turns one error into two. `likelyMeant` is a hint for the tutor, not a fix.
  */
 const RISKY_OUTPUT_TERMS = [
-  { pattern: /\bf+u+c+k\w*\b/gi, likelyMeant: 'funk' },
+  // Swearing and slurs.
+  { pattern: /\bf+u+c+k\w*\b/gi, likelyMeant: 'funk, or pluck' },
   { pattern: /\bsh[i1]t\w*\b/gi, likelyMeant: 'sheet, or shift' },
   { pattern: /\bbitch\w*\b/gi, likelyMeant: 'pitch' },
   { pattern: /\bprick\w*\b/gi, likelyMeant: 'pick' },
   { pattern: /\bdick\w*\b/gi, likelyMeant: 'pick, or lick' },
   { pattern: /\bcock\w*\b/gi, likelyMeant: '' },
-  { pattern: /\bcunt\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bcunt\w*\b/gi, likelyMeant: 'count' },
   { pattern: /\btwat\w*\b/gi, likelyMeant: '' },
   { pattern: /\bwank\w*\b/gi, likelyMeant: '' },
   { pattern: /\bbastard\w*\b/gi, likelyMeant: '' },
@@ -103,6 +104,58 @@ const RISKY_OUTPUT_TERMS = [
   { pattern: /\bnigg\w*\b/gi, likelyMeant: '' },
   { pattern: /\bfagg?\w*\b/gi, likelyMeant: '' },
   { pattern: /\bretard\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bcrap\w*\b/gi, likelyMeant: 'clap' },
+  { pattern: /\bdamn\w*\b/gi, likelyMeant: '' },
+  // Band name, and a recurring lesson topic: flagging it weekly teaches a tutor
+  // to click past the check.
+  { pattern: /\bbloody\b(?!\s+valentine)/gi, likelyMeant: '' },
+  { pattern: /\bpiss\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bbollock\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bbugger\w*\b/gi, likelyMeant: '' },
+  { pattern: /\btosser\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bbell ?end\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bpuss(y|ies)\b/gi, likelyMeant: '' },
+  { pattern: /\bcum\b/gi, likelyMeant: 'come' },
+  { pattern: /\bspunk\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bshag(s|ged|ging)?\b/gi, likelyMeant: '' },
+  { pattern: /\bpaki\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bspa(stic|z|zzy)\b/gi, likelyMeant: '' },
+  { pattern: /\btrann(y|ies)\b/gi, likelyMeant: '' },
+
+  // Sexual wording. Written to a child's family, this needs a second look even
+  // when it was said on purpose (describing a song's style, say). "Sex" and
+  // "sexy" are also plausible mishearings of "sax" and "six".
+  { pattern: /\bsex\b/gi, likelyMeant: 'sax, or six' },
+  { pattern: /\bsex(y|ier|iest|ual\w*|uality)\b/gi, likelyMeant: '' },
+  { pattern: /\bseduc\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bsensual\w*\b/gi, likelyMeant: '' },
+  { pattern: /\berotic\w*\b/gi, likelyMeant: '' },
+  { pattern: /\bhorny\b/gi, likelyMeant: 'horn' },
+  { pattern: /\bkinky\b/gi, likelyMeant: '' },
+  { pattern: /\bporn\w*\b/gi, likelyMeant: '' },
+  { pattern: /\borgasm\w*\b/gi, likelyMeant: '' },
+  { pattern: /\b(nude|nudes|naked)\b/gi, likelyMeant: '' },
+  { pattern: /\bboob\w*\b/gi, likelyMeant: '' },
+  { pattern: /\btits\b/gi, likelyMeant: '' },
+  { pattern: /\b(penis|vagina|genital\w*)\b/gi, likelyMeant: '' },
+  { pattern: /\brap(e|ed|es|ist)\b/gi, likelyMeant: 'rap' },
+  { pattern: /\bmolest\w*\b/gi, likelyMeant: '' },
+
+  // Possible safeguarding disclosures. These belong with the safeguarding lead,
+  // not in an email home — the reviewer may be the only person who sees it.
+  { pattern: /\bsuicid\w*\b/gi, likelyMeant: '', category: 'safeguarding' },
+  { pattern: /\bself[- ]?harm\w*\b/gi, likelyMeant: '', category: 'safeguarding' },
+  { pattern: /\b(kill|hurt|cut|cutting|harm)\s+(myself|himself|herself|themselves|themself)\b/gi, likelyMeant: '', category: 'safeguarding' },
+  { pattern: /\babus(e|ed|es|ing|ive)\b/gi, likelyMeant: '', category: 'safeguarding' },
+  { pattern: /\bbull(y|ied|ies|ying)\b/gi, likelyMeant: '', category: 'safeguarding' },
+
+  // Drugs and drink.
+  // "Drunk Drivers/Killer Whales" is a song title on a student's shelf.
+  { pattern: /\b(cocaine|heroin|cannabis|weed|stoned)\b/gi, likelyMeant: '' },
+  { pattern: /\bdrunk\b(?!\s+drivers)/gi, likelyMeant: '' },
+
+  // Insults: a note home should never call a student these, even in jest.
+  { pattern: /\b(stupid|idiot\w*|dumb|useless|pathetic|ugly)\b/gi, likelyMeant: '' },
 ];
 
 function removeFillerWords(text) {
@@ -196,7 +249,8 @@ export function enhancedCleanupSpeechText(text) {
  * outright: a false positive must not make a legitimate note unsendable.
  *
  * @param {string} text - The finished note text
- * @returns {Object} - { ok: boolean, findings: [{ term, likelyMeant }] }
+ * @returns {Object} - { ok: boolean, findings: [{ term, likelyMeant, category }] }
+ *   category is 'safeguarding' for a possible disclosure, else 'wording'.
  */
 export function checkNoteSafety(text) {
     const value = `${text || ''}`;
@@ -205,7 +259,7 @@ export function checkNoteSafety(text) {
     const findings = [];
     const seen = new Set();
 
-    for (const { pattern, likelyMeant } of RISKY_OUTPUT_TERMS) {
+    for (const { pattern, likelyMeant, category = 'wording' } of RISKY_OUTPUT_TERMS) {
         // Fresh regex per call: the shared literals carry /g and therefore
         // lastIndex state.
         const matches = value.match(new RegExp(pattern.source, 'gi')) || [];
@@ -213,7 +267,7 @@ export function checkNoteSafety(text) {
             const key = match.toLowerCase();
             if (seen.has(key)) continue;
             seen.add(key);
-            findings.push({ term: match, likelyMeant });
+            findings.push({ term: match, likelyMeant, category });
         }
     }
 

@@ -106,7 +106,7 @@ test('checkNoteSafety flags a likely mis-transcription with a hint', () => {
   const result = checkNoteSafety('We worked on the fuck rhythm today');
   assert.equal(result.ok, false);
   assert.equal(result.findings.length, 1);
-  assert.equal(result.findings[0].likelyMeant, 'funk');
+  assert.equal(result.findings[0].likelyMeant, 'funk, or pluck');
 });
 
 test('checkNoteSafety never rewrites the text it checks', () => {
@@ -122,6 +122,77 @@ test('checkNoteSafety does not fire on music words containing risky fragments', 
     'Great class today',
     'We used a shaker',
     'The pitch was spot on',
+  ];
+  for (const note of safe) {
+    assert.equal(checkNoteSafety(note).ok, true, `false positive on: ${note}`);
+  }
+});
+
+test('checkNoteSafety flags sexual wording even when it was meant', () => {
+  // Both from real notes: describing a song's delivery, and praising scales.
+  for (const note of [
+    'Relaxed, but sexual and seduction-wise, like the live version',
+    'Using the scales in the songs is really sexy.',
+    'Keep it sensual and breathy in the verse',
+  ]) {
+    assert.equal(checkNoteSafety(note).ok, false, `missed: ${note}`);
+  }
+});
+
+test('checkNoteSafety offers the music word when "sex" is a likely mishearing', () => {
+  const [finding] = checkNoteSafety('Great sex solo in the bridge').findings;
+  assert.equal(finding.likelyMeant, 'sax, or six');
+});
+
+test('checkNoteSafety flags possible safeguarding disclosures', () => {
+  for (const note of [
+    'She mentioned she has been self-harming',
+    'He said he wants to kill himself',
+    'Talked about being bullied at school',
+    'Mentioned some abuse at home',
+    'Something about suicide came up',
+  ]) {
+    assert.equal(checkNoteSafety(note).ok, false, `missed: ${note}`);
+  }
+});
+
+test('checkNoteSafety tags disclosures separately so the prompt can say the right thing', () => {
+  assert.deepEqual(
+    checkNoteSafety('Talked about being bullied at school').findings.map((f) => f.category),
+    ['safeguarding']
+  );
+  assert.deepEqual(
+    checkNoteSafety('We worked on the fuck rhythm today').findings.map((f) => f.category),
+    ['wording']
+  );
+});
+
+test('checkNoteSafety flags milder swearing, drugs and insults', () => {
+  for (const note of ['That was pretty damn easy', 'Total crap today', 'He seemed stoned', 'Stop being stupid']) {
+    assert.equal(checkNoteSafety(note).ok, false, `missed: ${note}`);
+  }
+});
+
+test('checkNoteSafety stays quiet on everyday music and tutor language', () => {
+  // A check that cries wolf gets clicked through. Every phrase here is
+  // ordinary lesson talk that brushes against a listed word.
+  const safe = [
+    'You absolutely killed it today, killer riff',
+    'Fat tone on that low E',
+    'Depress the sustain pedal slowly',
+    'Highway to Hell intro',
+    'Strip it back to just the chords',
+    'Horn section entry at bar 9',
+    'The guitar is cutting through the mix nicely',
+    'Sextuplets in the fill, then the sextet section',
+    'Clap the rhythm, then scrap the old fingering',
+    'Watch the bullet points in your practice sheet',
+    'Spoke to the therapist about posture? No: the physio',
+    'Tweed amp tones and the Rolling Stones',
+    'Your Sussex grade exam is in November',
+    'We looked at Soon by My Bloody Valentine',
+    "We'll have a look at Drunk Drivers/Killer Whales next week",
+    'Titanium by David Guetta',
   ];
   for (const note of safe) {
     assert.equal(checkNoteSafety(note).ok, true, `false positive on: ${note}`);

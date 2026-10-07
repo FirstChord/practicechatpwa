@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v31-server-transcription';
+const CACHE_NAME = 'practice-chat-v32-wording-check';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261006-server-transcription',
-  '/src/app.js?v=20261006-server-transcription',
-  '/src/practice-note-sync.js?v=20261006-server-transcription',
-  '/src/note-markup.js?v=20261006-server-transcription',
+  '/css/styles.css?v=20261007-wording-check',
+  '/src/app.js?v=20261007-wording-check',
+  '/src/practice-note-sync.js?v=20261007-wording-check',
+  '/src/note-markup.js?v=20261007-wording-check',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
