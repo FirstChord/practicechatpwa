@@ -297,10 +297,18 @@ practice-chat/
 ```
 
 ### Making Changes
-1. Edit files in `public/`
-2. Run tests: `npm test`
-3. Test locally: `python3 -m http.server 8000 --directory public`
-4. Deploy: `firebase deploy --only hosting`
+1. Edit files in `public/`, on `main`
+2. Bump the `?v=` stamp everywhere and `CACHE_NAME` in `service-worker.js`
+3. Run tests: `npm test`
+4. Test locally: `python3 -m http.server 8000 --directory public`
+5. Deploy: commit and `git push` — `.github/workflows/firebase-hosting-main.yml`
+   runs the tests and deploys only if they pass. A manual
+   `firebase deploy --only hosting` also runs the tests first (predeploy hook),
+   but leaves GitHub behind what is live; between August and October 2026 that
+   is how the live code ended up on a branch nobody had pushed.
+
+**This repository is public.** Never commit real student ids, names, emails or
+secrets; tests use made-up ids such as `sdt_TEST01`.
 
 ---
 
