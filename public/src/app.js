@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-italic';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-italic';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-sky';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-sky';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261008-italic';
+} from './practice-note-sync.js?v=20261008-sky';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261008-italic';
+} from './session-telemetry.js?v=20261008-sky';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,9 +41,10 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261008-italic';
+} from './note-markup.js?v=20261008-sky';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261008-sky';
 
-const PRACTICE_CHAT_BUILD = '20261008-italic';
+const PRACTICE_CHAT_BUILD = '20261008-sky';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -131,6 +132,8 @@ class PracticeChatApp {
         this.loadTranscriptionPrompt();
         this.sendSessionTelemetry();
         this.bindSessionFlush();
+        this.applyTimeOfDaySky();
+        window.setInterval(() => this.applyTimeOfDaySky(), 60 * 1000);
     }
 
     /**
@@ -722,6 +725,19 @@ class PracticeChatApp {
         } else if (state === 'next' || state === 'finish') {
             this.mainActionBtn.classList.add('btn-success');
         }
+    }
+
+    // The dashboard's sky, matched to the local time, so the panel feels like
+    // part of the page it opens over. ?skyTime=19:45 previews a time, on a
+    // local server only.
+    applyTimeOfDaySky() {
+        const now = new Date();
+        let minutes = now.getHours() * 60 + now.getMinutes();
+        if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            const preview = new URLSearchParams(window.location.search).get('skyTime')?.match(/^(\d{1,2}):(\d{2})$/);
+            if (preview) minutes = Number(preview[1]) * 60 + Number(preview[2]);
+        }
+        Object.assign(document.body.style, skyBackground(getTimeOfDaySky(minutes)));
     }
 
     // Empty text hides it.

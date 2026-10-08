@@ -3,17 +3,18 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v37-italic';
+const CACHE_NAME = 'practice-chat-v38-sky';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261008-italic',
-  '/src/app.js?v=20261008-italic',
-  '/src/practice-note-sync.js?v=20261008-italic',
-  '/src/note-markup.js?v=20261008-italic',
+  '/css/styles.css?v=20261008-sky',
+  '/src/app.js?v=20261008-sky',
+  '/src/practice-note-sync.js?v=20261008-sky',
+  '/src/note-markup.js?v=20261008-sky',
+  '/src/time-of-day-sky.js?v=20261008-sky',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
