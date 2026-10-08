@@ -1438,6 +1438,22 @@ textarea {
 
 /* --- Question -------------------------------------------------------------- */
 
+/* The three questions share one grid cell; the cell takes the tallest one's
+   height, so the button below stays put from question to question. */
+.question-stack {
+    display: grid;
+}
+
+.question-block {
+    grid-area: 1 / 1;
+    align-self: center;
+    visibility: hidden;
+}
+
+.question-block.is-current {
+    visibility: visible;
+}
+
 .question-card .question-text {
     margin: 0;
     font-size: 30px;
