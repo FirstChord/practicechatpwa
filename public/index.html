@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css?v=20261007-practice-plan">
+    <link rel="stylesheet" href="/css/styles.css?v=20261008-refresh">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -27,7 +27,6 @@
                 </div>
             </div>
         </div>
-        <div class="tagline">Capture lesson conversations and practice reflections</div>
     </header>
 
     <!-- Main Content -->
@@ -37,51 +36,43 @@
 
         <!-- Question Section -->
         <div id="questionSection">
-            <!-- Question Progress -->
-            <div class="card">
-                <div class="question-progress-bar">
-                    <div class="progress-item active">1</div>
-                    <div class="progress-line"></div>
-                    <div class="progress-item">2</div>
-                    <div class="progress-line"></div>
-                    <div class="progress-item">3</div>
-                </div>
-                <div class="question-header">
-                    <h2 id="questionNumber" class="question-number">Question 1 of 3</h2>
-                    <span id="questionProgress" class="question-badge">1/3</span>
-                </div>
-                <div class="question-text-container">
-                    <p id="questionText" class="question-text">What did we do in the lesson?</p>
-                </div>
-            </div>
+            <ol class="steps" aria-label="Steps">
+                <li class="step on"><span class="step-mark">1</span>The lesson</li>
+                <li class="step-rule" aria-hidden="true"></li>
+                <li class="step"><span class="step-mark">2</span>How it went</li>
+                <li class="step-rule" aria-hidden="true"></li>
+                <li class="step"><span class="step-mark">3</span>The plan</li>
+            </ol>
 
-            <!-- Recording Controls -->
-            <div class="card">
-                <h3 class="card-subtitle">Record Your Answer</h3>
+            <!-- One card: the question as the largest text, then the button.
+                 Recording state lives inside the button, so nothing here moves
+                 when recording starts; the answer appears below the button,
+                 so after Stop the cursor is already on Next. -->
+            <div class="card question-card">
+                <h2 id="questionText" class="question-text"><span>What did we work on today?</span></h2>
+                <p id="questionFollow" class="question-follow" hidden></p>
 
-                <!-- Main Action Button -->
                 <button id="mainActionBtn" class="btn btn-primary btn-large">
-                    <span class="btn-icon">🎤</span>
-                    <span id="mainActionText">Start Recording</span>
+                    <span class="btn-icon"></span>
+                    <span id="mainActionText">Start recording</span>
+                    <span id="mainActionHint" class="btn-hint"></span>
                 </button>
 
-                <!-- Current Answer Display -->
                 <div id="currentAnswer" class="answer-box" style="display: none;">
                     Your answer will appear here...
                 </div>
+            </div>
 
-                <!-- Secondary Actions -->
-                <div class="secondary-actions">
-                    <button id="backBtn" class="btn-link" style="display: none;">
-                        ← Back
-                    </button>
-                    <button id="typeNotesBtn" class="btn-link type-notes-link">
-                        Type notes instead
-                    </button>
-                    <button id="skipBtn" class="btn-link">
-                        Skip Question →
-                    </button>
-                </div>
+            <div class="secondary-actions question-links">
+                <button id="backBtn" class="btn-link" style="display: none;">
+                    ← Back
+                </button>
+                <button id="typeNotesBtn" class="btn-link type-notes-link">
+                    Type notes instead
+                </button>
+                <button id="skipBtn" class="btn-link">
+                    Skip question →
+                </button>
             </div>
         </div>
 
@@ -89,7 +80,7 @@
         <div id="outputSection" class="output-section">
             <div class="card">
                 <h3 class="card-subtitle">Review Lesson Notes</h3>
-                <p class="review-helper">You can edit these notes here before saving. This is the final note that will be saved and sent.</p>
+                <p class="review-helper">This is the note that will be sent. Change anything you like.</p>
                 <div class="note-toolbar" role="toolbar" aria-label="Formatting" aria-controls="processed">
                     <button type="button" class="note-tool" data-format="bold" aria-pressed="false" title="Bold (Cmd/Ctrl+B)">
                         <span class="note-tool-glyph note-tool-glyph-bold" aria-hidden="true">B</span><span class="sr-only">Bold</span>
@@ -175,10 +166,12 @@
                             <span>Student absent today</span>
                         </label>
                     </fieldset>
+                    <!-- The date tick that unlocks the button sits above it, so the
+                         order on screen is the order of the steps. -->
+                    <div id="mmsPreview" class="mms-test-preview" style="display: none;"></div>
                     <div class="mms-test-actions">
                         <button id="mmsExecuteBtn" class="btn btn-success btn-large" type="button" disabled>Save notes, mark present & email parent</button>
                     </div>
-                    <div id="mmsPreview" class="mms-test-preview" style="display: none;"></div>
                 </div>
 
                 <!--
@@ -222,7 +215,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20261007-practice-plan"></script>
+    <script type="module" src="/src/app.js?v=20261008-refresh"></script>
 
     <!-- Service Worker Registration -->
     <script>

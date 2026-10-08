@@ -1318,3 +1318,336 @@ body {
     line-height: 1.45;
     opacity: 0.8;
 }
+
+/* ==========================================================================
+   Refresh, October 2026
+   A visual layer over the rules above: same colours and typeface, calmer
+   surfaces, and the question as the largest text on screen. It sits last so it
+   wins over the 768px media queries, which matter because the dashboard's
+   slide-over panel is exactly 768px wide. Plan and research:
+   dashboard docs/plans/active/practice-chat-questions.md
+   ========================================================================== */
+
+body {
+    background: linear-gradient(to bottom, #F5F9FC 0%, #EEF6F0 100%);
+}
+
+/* Buttons and form controls do not inherit the page font by default, so every
+   button here had quietly been rendering in Arial. */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+.container {
+    max-width: 560px;
+}
+
+.header {
+    max-width: 560px;
+    padding: 4px 20px 0;
+    margin-bottom: 22px;
+}
+
+.logo-container {
+    margin-bottom: 0;
+}
+
+.logo-image {
+    width: 184px;
+}
+
+.logo-text {
+    font-size: 42px;
+}
+
+/* --- Steps ----------------------------------------------------------------- */
+
+.steps {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 4px 18px;
+    padding: 0;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #9CA3AF;
+    white-space: nowrap;
+}
+
+.step-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    background: #E5E7EB;
+    color: #6B7280;
+}
+
+.step.on {
+    color: var(--text-dark);
+}
+
+.step.on .step-mark {
+    background: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(62, 141, 88, 0.15);
+}
+
+.step.done {
+    color: var(--primary-dark);
+}
+
+.step.done .step-mark {
+    background: rgba(62, 141, 88, 0.15);
+    color: var(--primary-dark);
+}
+
+.step-rule {
+    flex: 1;
+    height: 2px;
+    border-radius: 2px;
+    background: #E5E7EB;
+}
+
+.step-rule.done {
+    background: rgba(62, 141, 88, 0.35);
+}
+
+/* --- Cards ----------------------------------------------------------------- */
+
+.card {
+    background: #fff;
+    border: 1px solid rgba(30, 30, 30, 0.09);
+    border-radius: 20px;
+    padding: 30px 30px 26px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(30, 60, 40, 0.06);
+}
+
+/* --- Question -------------------------------------------------------------- */
+
+.question-card .question-text {
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-dark);
+}
+
+.question-text span {
+    display: block;
+}
+
+.question-follow {
+    margin: 12px 0 0;
+    font-size: 17px;
+    line-height: 1.45;
+    font-weight: 500;
+    color: #6B7280;
+}
+
+.question-card .btn-large {
+    margin: 26px 0 0;
+    min-height: 64px;
+    border-radius: 16px;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(62, 141, 88, 0.25);
+}
+
+.btn-icon:empty,
+.btn-hint:empty {
+    display: none;
+}
+
+.btn-icon svg {
+    display: block;
+}
+
+/* Listening: a calm state, not a meter or a clock. */
+.btn-listening {
+    background: #1F3B2A;
+    justify-content: flex-start;
+    padding: 0 22px;
+}
+
+.btn-listening:disabled {
+    opacity: 0.85;
+}
+
+.btn-hint {
+    margin-left: auto;
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+.listening-dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #F87171;
+    box-shadow: 0 0 0 7px rgba(248, 113, 113, 0.22), 0 0 0 14px rgba(248, 113, 113, 0.08);
+    animation: listening-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes listening-breathe {
+    50% {
+        box-shadow: 0 0 0 10px rgba(248, 113, 113, 0.16), 0 0 0 20px rgba(248, 113, 113, 0.05);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .listening-dot {
+        animation: none;
+    }
+}
+
+.question-card .answer-box {
+    margin-top: 18px;
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 16px;
+    line-height: 1.6;
+    font-weight: 400;
+}
+
+.question-links {
+    margin-top: 12px;
+    padding: 0 4px;
+    border-top: none;
+}
+
+/* --- Review ---------------------------------------------------------------- */
+
+.card-subtitle {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.review-helper {
+    margin: 0 0 14px;
+    font-size: 15px;
+}
+
+/* The note itself: larger, airier type with the section labels picked out.
+   Labels change colour and size only, never weight (see renderEditorMarkup). */
+.output-box {
+    background: #fff;
+    border: 1px solid rgba(30, 30, 30, 0.14);
+    border-radius: 14px;
+    padding: 20px 22px;
+    font-size: 17px;
+    line-height: 1.65;
+    font-weight: 400;
+}
+
+.output-box:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(62, 141, 88, 0.12);
+}
+
+.note-label {
+    color: var(--primary-dark);
+    font-size: 14px;
+    letter-spacing: 0.03em;
+}
+
+/* One quiet surface for every routine step. The amber here was a leftover from
+   the MMS pilot, and amber reads as "warning". */
+.song-link-panel,
+.mms-test-panel {
+    background: #F7FAF7;
+    border: 1px solid rgba(62, 141, 88, 0.16);
+    border-radius: 14px;
+    padding: 14px 16px;
+}
+
+.attendance-choice {
+    background: #fff;
+}
+
+.mms-test-preview {
+    margin: 12px 0 0;
+    background: #fff;
+    border: 1px solid rgba(30, 30, 30, 0.08);
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.date-confirmation {
+    font-size: 16px;
+}
+
+.mms-test-actions {
+    margin-top: 14px;
+}
+
+/* Songs: the same green accent as everything else, in place of the purple. */
+.song-choice input[type="checkbox"] {
+    accent-color: var(--primary-color);
+}
+
+.song-choice.selected {
+    background: rgba(62, 141, 88, 0.08);
+}
+
+.song-choice:hover {
+    background: rgba(62, 141, 88, 0.05);
+}
+
+.song-more-options {
+    border-top-color: rgba(62, 141, 88, 0.14);
+}
+
+.song-more-options summary {
+    color: var(--primary-dark);
+}
+
+.song-text-input {
+    border-color: rgba(30, 30, 30, 0.16);
+}
+
+.song-text-input:focus {
+    outline: 2px solid rgba(62, 141, 88, 0.2);
+    border-color: var(--primary-color);
+}
+
+@media (max-width: 480px) {
+    .card {
+        padding: 22px 20px 20px;
+    }
+
+    .question-card .question-text {
+        font-size: 24px;
+    }
+
+    .step {
+        font-size: 12px;
+    }
+
+    .logo-image {
+        width: 140px;
+    }
+
+    .logo-text {
+        font-size: 32px;
+    }
+}

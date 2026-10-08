@@ -168,6 +168,26 @@ export function renderNoteMarkup(text = '') {
     .replace(ITALIC, '$1<em>$2</em>');
 }
 
+// The section labels the app writes, as they look once escaped.
+const EDITOR_SECTION_LABEL = /^\[(?:What we did|Progress &amp; Challenges|Practice Goals)\]$/u;
+
+/**
+ * Editor HTML: renderNoteMarkup, plus a class on each section-label line so a
+ * tutor can see the note's shape at a glance. Editor only: the clipboard and
+ * the stored note never see it.
+ *
+ * Styled by colour and size, never weight, and through a class rather than an
+ * inline style: rawNoteText reads an inline font-weight as bold, and
+ * contenteditable copies computed styles inline when two lines are merged, so
+ * a bold label could leak ** markers into a parent's email.
+ */
+export function renderEditorMarkup(text = '') {
+  return renderNoteMarkup(text)
+    .split('\n')
+    .map((line) => (EDITOR_SECTION_LABEL.test(line.trim()) ? `<span class="note-label">${line}</span>` : line))
+    .join('\n');
+}
+
 /**
  * Block-level HTML for the clipboard.
  *

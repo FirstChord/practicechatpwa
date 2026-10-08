@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
     noteMarkupToHtml,
     rawNoteText,
+    renderEditorMarkup,
     renderNoteMarkup,
     serialiseNoteMarkup,
     stripNoteMarkers,
@@ -150,4 +151,34 @@ test('clipboard HTML carries paragraphs, bullets and emphasis', () => {
 
 test('clipboard HTML cannot carry tutor-authored markup', () => {
     assert.equal(noteMarkupToHtml('<b>not mine</b>'), '<p>&lt;b&gt;not mine&lt;/b&gt;</p>');
+});
+
+// --- Editor section labels ----------------------------------------------------
+
+test('renderEditorMarkup picks out the three section labels, and only those', () => {
+    const html = renderEditorMarkup('[What we did]\nScales\n\n[Progress & Challenges]\nGood\n\n[Practice Goals]\nSlowly\n[my own note]');
+    assert.equal((html.match(/class="note-label"/g) || []).length, 3);
+    assert.match(html, /<span class="note-label">\[Progress &amp; Challenges\]<\/span>/);
+    // A tutor's own bracketed text is left alone.
+    assert.match(html, /\n\[my own note\]$/);
+});
+
+test('renderEditorMarkup styles by class, never by inline weight', () => {
+    // rawNoteText reads an inline font-weight as bold. A bold label could
+    // leak ** markers into a parent's email once contenteditable inlines it.
+    const html = renderEditorMarkup('[What we did]\nScales');
+    assert.doesNotMatch(html, /style=|<strong>|<b>/);
+});
+
+test('a styled label line saves as exactly the original text', () => {
+    // The editor tree renderEditorMarkup produces: a classed span, no style.
+    const editor = root([
+        el('SPAN', [text('[What we did]')]),
+        text('\nWe played **Let It Be**.')
+    ]);
+    assert.equal(serialiseNoteMarkup(editor), '[What we did]\nWe played **Let It Be**.');
+});
+
+test('renderEditorMarkup keeps bold and italic rendering', () => {
+    assert.equal(renderEditorMarkup('Play **slowly**'), renderNoteMarkup('Play **slowly**'));
 });

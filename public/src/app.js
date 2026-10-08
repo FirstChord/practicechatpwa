@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261007-practice-plan';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261007-practice-plan';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-refresh';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-refresh';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261007-practice-plan';
+} from './practice-note-sync.js?v=20261008-refresh';
 import {
     buildSessionPayload,
     createSession,
@@ -33,25 +33,33 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261007-practice-plan';
+} from './session-telemetry.js?v=20261008-refresh';
 import {
     noteMarkupToHtml,
     rawNoteText,
-    renderNoteMarkup,
+    renderEditorMarkup,
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261007-practice-plan';
+} from './note-markup.js?v=20261008-refresh';
 
-const PRACTICE_CHAT_BUILD = '20261007-practice-plan';
+const PRACTICE_CHAT_BUILD = '20261008-refresh';
 
+// Each question is what the tutor says aloud, plus at most one lighter
+// follow-up line. Worded to work whether the student or the tutor answers: many
+// lessons end in guidance, not conversation. Research and options:
+// dashboard docs/plans/active/practice-chat-questions.md.
 const QUESTIONS = [
-    "What did we do in the lesson?",
-    "What went well or what was challenging?",
-    // How, when and where: a plan with a time and place is followed through far
-    // more often than a goal alone (implementation intentions, d≈0.65).
-    "What will you practise this week, and how, when and where?"
+    { lines: ['What did we work on today?'], follow: '' },
+    // Two single questions rather than one with "or", so both get answered.
+    // "What helped" steers towards strategy, which the student controls.
+    { lines: ['What went well?', 'What’s still tricky?'], follow: 'And what helped?' },
+    // A plan with a time and place is followed through far more often than a
+    // goal alone (implementation intentions, d≈0.65).
+    { lines: ['What’s the plan for this week?'], follow: 'What to play, how to practise it, and a time and place to do it.' }
 ];
+
+const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 
 const QUESTION_LABELS = [
     "[What we did]",
@@ -198,13 +206,13 @@ class PracticeChatApp {
 
     initializeElements() {
         // Question elements
-        this.questionNumberEl = document.getElementById('questionNumber');
         this.questionTextEl = document.getElementById('questionText');
-        this.questionProgressEl = document.getElementById('questionProgress');
+        this.questionFollowEl = document.getElementById('questionFollow');
 
         // Main action button
         this.mainActionBtn = document.getElementById('mainActionBtn');
         this.mainActionText = document.getElementById('mainActionText');
+        this.mainActionHint = document.getElementById('mainActionHint');
 
         // Navigation buttons
         this.skipBtn = document.getElementById('skipBtn');
@@ -269,7 +277,7 @@ class PracticeChatApp {
     }
 
     setNoteContent(text = '') {
-        this.processedEl.innerHTML = renderNoteMarkup(text);
+        this.processedEl.innerHTML = renderEditorMarkup(text);
         this.syncToolbarState();
     }
 
@@ -645,7 +653,7 @@ class PracticeChatApp {
         }
 
         this.questionAnswers = ['', '', ''];
-        this.processedEl.textContent = this.buildTypedNoteTemplate();
+        this.setNoteContent(this.buildTypedNoteTemplate());
         this.questionSection.style.display = 'none';
         this.outputSection.classList.add('show');
         this.showStatus('Type or paste the lesson notes, then check the lesson date.', 'info');
@@ -686,27 +694,42 @@ class PracticeChatApp {
         }
     }
 
-    updateMainButton(state, text, icon) {
+    updateMainButton(state, text, icon = '') {
         this.buttonState = state;
         this.mainActionText.textContent = text;
-        this.mainActionBtn.querySelector('.btn-icon').textContent = icon;
+        const iconEl = this.mainActionBtn.querySelector('.btn-icon');
+        // Recording shows a calm breathing dot, not a level meter or a clock:
+        // the student watches this screen, and a moving meter or a running
+        // timer is pressure. The state lives in the button so nothing above it
+        // moves when recording starts.
+        if (state === 'start') {
+            iconEl.innerHTML = MIC_ICON;
+        } else if (state === 'stop') {
+            iconEl.innerHTML = '<span class="listening-dot" aria-hidden="true"></span>';
+        } else {
+            iconEl.textContent = icon;
+        }
+        this.mainActionHint.textContent = state === 'stop' ? 'Tap to stop' : '';
 
-        // Update button color based on state
         this.mainActionBtn.className = 'btn btn-large';
-        if (state === 'start' || state === 'stop') {
+        if (state === 'start') {
             this.mainActionBtn.classList.add('btn-primary');
-        } else if (state === 'next') {
-            this.mainActionBtn.classList.add('btn-success');
-        } else if (state === 'finish') {
+        } else if (state === 'stop' || state === 'processing') {
+            this.mainActionBtn.classList.add('btn-listening');
+        } else if (state === 'next' || state === 'finish') {
             this.mainActionBtn.classList.add('btn-success');
         }
     }
 
     updateQuestionDisplay() {
-        const questionNum = this.currentQuestionIndex + 1;
-        this.questionNumberEl.textContent = `Question ${questionNum} of 3`;
-        this.questionTextEl.textContent = QUESTIONS[this.currentQuestionIndex];
-        this.questionProgressEl.textContent = `${questionNum}/3`;
+        const question = QUESTIONS[this.currentQuestionIndex];
+        this.questionTextEl.replaceChildren(...question.lines.map((line) => {
+            const span = document.createElement('span');
+            span.textContent = line;
+            return span;
+        }));
+        this.questionFollowEl.textContent = question.follow;
+        this.questionFollowEl.hidden = !question.follow;
 
         // Update progress bar
         this.updateProgressBar();
@@ -722,36 +745,32 @@ class PracticeChatApp {
 
             // Button shows "Next Question" or "Finish"
             if (this.currentQuestionIndex < 2) {
-                this.updateMainButton('next', 'Next Question', '→');
+                this.updateMainButton('next', 'Next question →');
             } else {
-                this.updateMainButton('finish', 'Finish', '✅');
+                this.updateMainButton('finish', 'Finish', '✓');
             }
         } else {
             this.currentAnswerEl.style.display = 'none';
-            // Button shows "Start Recording"
-            this.updateMainButton('start', 'Start Recording', '🎤');
+            this.updateMainButton('start', 'Start recording');
         }
     }
 
+    // Named steps (The lesson · How it went · The plan) rather than numbers:
+    // they show the shape of the ritual and match the note's three sections.
     updateProgressBar() {
-        const progressItems = document.querySelectorAll('.progress-item');
-
-        progressItems.forEach((item, index) => {
-            // Remove all classes
-            item.classList.remove('active', 'completed');
-
-            // Add appropriate class
-            if (index < this.currentQuestionIndex) {
-                item.classList.add('completed');
-            } else if (index === this.currentQuestionIndex) {
-                item.classList.add('active');
-            }
+        document.querySelectorAll('.step').forEach((step, index) => {
+            const done = index < this.currentQuestionIndex;
+            step.classList.toggle('done', done);
+            step.classList.toggle('on', index === this.currentQuestionIndex);
+            step.querySelector('.step-mark').textContent = done ? '✓' : String(index + 1);
+        });
+        document.querySelectorAll('.step-rule').forEach((rule, index) => {
+            rule.classList.toggle('done', index < this.currentQuestionIndex);
         });
     }
 
     async startRecording() {
         try {
-            this.showStatus('Starting recording...', 'info');
 
             // Create new Whisper ASR client
             this.asrClient = new WhisperASRClient({
@@ -777,7 +796,7 @@ class PracticeChatApp {
                 recordAsrError(this.session, this.currentQuestionIndex);
                 this.showStatus(`Error: ${error.message}`, 'error');
                 this.isRecording = false;
-                this.updateMainButton('start', 'Start Recording', '🎤');
+                this.updateMainButton('start', 'Start recording');
                 this.skipBtn.disabled = false;
             };
 
@@ -786,10 +805,12 @@ class PracticeChatApp {
 
             recordingStarted(this.session, this.currentQuestionIndex);
             this.isRecording = true;
-            this.updateMainButton('stop', 'Stop Recording', '⏹️');
+            // A successful start retires any earlier error; the routine
+            // "starting" banner that used to overwrite it is gone.
+            this.clearStatus();
+            this.updateMainButton('stop', 'Listening…');
             this.skipBtn.disabled = true;
             this.backBtn.disabled = true;
-            this.showStatus('🎤 Recording... Speak naturally', 'recording');
 
         } catch (error) {
             console.error('Failed to start recording:', error);
@@ -798,7 +819,7 @@ class PracticeChatApp {
             recordAsrError(this.session, this.currentQuestionIndex);
             this.showStatus(`Failed to start: ${error.message}`, 'error');
             this.isRecording = false;
-            this.updateMainButton('start', 'Start Recording', '🎤');
+            this.updateMainButton('start', 'Start recording');
         }
     }
 
@@ -806,7 +827,7 @@ class PracticeChatApp {
         if (!this.asrClient) return;
 
         try {
-            this.showStatus('Processing... (this may take a few seconds)', 'info');
+            this.updateMainButton('processing', 'Transcribing…');
             this.mainActionBtn.disabled = true;
 
             // Splits capture time from provider latency: a tutor talking for
@@ -820,14 +841,13 @@ class PracticeChatApp {
             this.skipBtn.disabled = false;
             this.backBtn.disabled = false;
             this.mainActionBtn.disabled = false;
-            this.showStatus('Answer recorded!', 'success');
 
         } catch (error) {
             console.error('Failed to process recording:', error);
             recordAsrError(this.session, this.currentQuestionIndex);
             this.showStatus(`Processing failed: ${error.message}`, 'error');
             this.isRecording = false;
-            this.updateMainButton('start', 'Start Recording', '🎤');
+            this.updateMainButton('start', 'Start recording');
             this.skipBtn.disabled = false;
             this.backBtn.disabled = false;
             this.mainActionBtn.disabled = false;
@@ -842,7 +862,7 @@ class PracticeChatApp {
 
         if (!this.currentTranscript.trim()) {
             this.showStatus('No answer recorded', 'warning');
-            this.updateMainButton('start', 'Start Recording', '🎤');
+            this.updateMainButton('start', 'Start recording');
             return;
         }
 
@@ -858,9 +878,9 @@ class PracticeChatApp {
 
         // Update main button to show Next or Finish
         if (this.currentQuestionIndex < 2) {
-            this.updateMainButton('next', 'Next Question', '→');
+            this.updateMainButton('next', 'Next question →');
         } else {
-            this.updateMainButton('finish', 'Finish', '✅');
+            this.updateMainButton('finish', 'Finish', '✓');
         }
 
         // Clear current transcript
@@ -912,7 +932,6 @@ class PracticeChatApp {
         // Show output section
         this.outputSection.classList.add('show');
 
-        this.showStatus('Lesson notes complete!', 'success');
 
         markPhase(this.session, 'note_generated');
         this.sendSessionTelemetry();
@@ -931,7 +950,7 @@ class PracticeChatApp {
             }
         }
 
-        this.processedEl.textContent = output.trim();
+        this.setNoteContent(output.trim());
         this.refreshSongSuggestions();
 
         // Surface a mis-hearing early, while the tutor is still on the note.
@@ -1597,7 +1616,6 @@ class PracticeChatApp {
             this.selectedMmsAttendanceId = preview.targetAttendance?.attendanceId || '';
             this.mmsDateConfirmed = false;
             this.renderMmsPreview(preview);
-            this.showStatus('Suggested lesson found. Tick the date if it is correct.', 'success');
             // Asked after the preview renders, so a slow or failing group lookup
             // never delays or breaks the ordinary one-student flow.
             await this.loadLessonGroup(noteText);
@@ -1955,6 +1973,11 @@ class PracticeChatApp {
         } catch (error) {
             console.error('Failed to load previous notes:', error);
         }
+    }
+
+    clearStatus() {
+        this.statusEl.style.display = 'none';
+        this.statusEl.textContent = '';
     }
 
     showStatus(message, type = 'info') {
