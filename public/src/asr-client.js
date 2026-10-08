@@ -50,7 +50,6 @@ const PROCESSING_MESSAGES = [
     "Taking note of your notes…",
     "Dramatic pause…",
     "Consulting the crystal ball of transcription…",
-    "Casting spelling spells…",
     "Walking 500 miles…",
     "Processing how incredibly good your notes are…",
     "Tuning up the transcript…",

@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v36-shimmer';
+const CACHE_NAME = 'practice-chat-v37-italic';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261008-shimmer',
-  '/src/app.js?v=20261008-shimmer',
-  '/src/practice-note-sync.js?v=20261008-shimmer',
-  '/src/note-markup.js?v=20261008-shimmer',
+  '/css/styles.css?v=20261008-italic',
+  '/src/app.js?v=20261008-italic',
+  '/src/practice-note-sync.js?v=20261008-italic',
+  '/src/note-markup.js?v=20261008-italic',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'

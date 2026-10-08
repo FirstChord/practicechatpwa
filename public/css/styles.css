@@ -1539,7 +1539,8 @@ textarea {
     display: block;
     width: fit-content;
     margin: 18px 0 0 4px;
-    font-size: 15px;
+    font-size: 14px;
+    font-style: italic;
     font-weight: 700;
     letter-spacing: 0.02em;
     background: linear-gradient(100deg, #1F3B2A 0%, #1F3B2A 38%, #9FD3B0 50%, #1F3B2A 62%, #1F3B2A 100%);
