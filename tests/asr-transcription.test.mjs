@@ -23,7 +23,7 @@ function fakeDashboard({ status = 200, payload = { text: '  Let It Be went well.
 
 test('posts the recording to the dashboard with the shared secret, not to OpenAI', async () => {
   const { calls, fetchImpl } = fakeDashboard();
-  const text = await transcribeViaDashboard({
+  const result = await transcribeViaDashboard({
     dashboardBaseUrl: 'https://dash.example',
     practiceChatSecret: 'shh',
     audioBlob: audio(),
@@ -32,7 +32,7 @@ test('posts the recording to the dashboard with the shared secret, not to OpenAI
     fetchImpl
   });
 
-  assert.equal(text, 'Let It Be went well.');
+  assert.deepEqual(result, { text: 'Let It Be went well.', model: 'gpt-4o-mini-transcribe' });
   assert.equal(calls[0].url, 'https://dash.example/api/practice-notes/transcribe');
   assert.equal(calls[0].init.method, 'POST');
   assert.equal(calls[0].init.headers['X-FirstChord-PracticeChat-Secret'], 'shh');
@@ -41,6 +41,12 @@ test('posts the recording to the dashboard with the shared secret, not to OpenAI
   assert.equal(body.get('model'), 'gpt-4o-mini-transcribe');
   assert.equal(body.get('prompt'), 'Guitar. Let It Be.');
   assert.equal(body.get('file').size, 64);
+});
+
+test('reports the model the dashboard actually used when it fell back', async () => {
+  const { fetchImpl } = fakeDashboard({ payload: { text: 'Hi.', model: 'whisper-1' } });
+  const result = await transcribeViaDashboard({ dashboardBaseUrl: 'https://dash.example', audioBlob: audio(), model: 'gpt-9-transcribe', fetchImpl });
+  assert.equal(result.model, 'whisper-1');
 });
 
 test('leaves out an empty prompt', async () => {

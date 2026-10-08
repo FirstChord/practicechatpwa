@@ -12,37 +12,19 @@
 // has to remember mid-lesson.
 export const DEFAULT_ASR_MODEL = 'whisper-1';
 
-// Models this app knows how to call. An allow-list, not a pass-through: the
-// value arrives in a URL, so anything unrecognised must fall back rather than
-// be forwarded to OpenAI as-is.
-//
-// gpt-4o-transcribe-diarize is deliberately absent. It needs
-// response_format=diarized_json and a chunking_strategy, and accepts no prompt
-// at all — a different feature (named dialogue), not a drop-in swap.
-//
-// gpt-4o-mini-transcribe-2025-12-15 is the pinned December snapshot: OpenAI
-// reports ~90% fewer hallucinations than Whisper v2 and ~70% fewer than earlier
-// gpt-4o-transcribe models, optimised for short utterances and noisy
-// backgrounds — which is Practice Chat exactly. Pinned rather than using the
-// bare alias so a lesson's transcription cannot change under us mid-trial.
-const SUPPORTED_ASR_MODELS = new Set([
-  'whisper-1',
-  'gpt-4o-transcribe',
-  'gpt-4o-mini-transcribe',
-  'gpt-4o-mini-transcribe-2025-12-15',
-]);
+// No model allow-list here any more. Transcription runs through the
+// dashboard, which owns the only list (lib/config/practice-chat-asr.mjs) and
+// falls back to whisper-1 for anything it does not recognise, so a second copy
+// here could only drift: a model added there but not here would silently cancel
+// a trial. This only refuses values that are not shaped like a model name.
+// The model actually used comes back with the text and is what gets recorded.
+const MODEL_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 
 export function resolveAsrModel(search = '') {
     const requested = `${new URLSearchParams(search || '').get('asrModel') || ''}`.trim();
-    if (requested && !SUPPORTED_ASR_MODELS.has(requested)) {
-        // A typo in the Railway variable would otherwise mean "the trial quietly
-        // never happened" — the worst failure mode for a trial.
-        console.warn(`Unknown asrModel "${requested}" — falling back to ${DEFAULT_ASR_MODEL}`);
-    }
-    return SUPPORTED_ASR_MODELS.has(requested) ? requested : DEFAULT_ASR_MODEL;
+    return MODEL_NAME.test(requested) ? requested : DEFAULT_ASR_MODEL;
 }
 
-// Fun processing messages while transcribing
 // Shown in a shimmering line while the answer is transcribed. No emojis: the
 // lines from the original set that stood up without one were kept, the rest
 // replaced with quieter musical ones.
@@ -100,7 +82,9 @@ export async function transcribeViaDashboard({
     if (!response.ok) {
         throw new Error(payload.error || `Transcription failed (${response.status})`);
     }
-    return `${payload.text || ''}`.trim();
+    // The dashboard reports the model it actually used, which differs from the
+    // request whenever it fell back.
+    return { text: `${payload.text || ''}`.trim(), model: `${payload.model || model}` };
 }
 
 /**
@@ -234,13 +218,14 @@ export class WhisperASRClient {
     async transcribeAudio(audioBlob) {
         try {
             console.log('📤 Sending audio for transcription...');
-            const text = await transcribeViaDashboard({
+            const { text, model } = await transcribeViaDashboard({
                 dashboardBaseUrl: this.dashboardBaseUrl,
                 practiceChatSecret: this.practiceChatSecret,
                 audioBlob,
                 model: this.model,
                 prompt: this.prompt
             });
+            this.model = model;
             console.log('✅ Transcription completed');
             return text;
         } catch (error) {

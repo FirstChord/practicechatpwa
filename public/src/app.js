@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-absent';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-absent';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-contracts';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-contracts';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261008-absent';
+} from './practice-note-sync.js?v=20261008-contracts';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261008-absent';
+} from './session-telemetry.js?v=20261008-contracts';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,10 +41,11 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261008-absent';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261008-absent';
+} from './note-markup.js?v=20261008-contracts';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261008-contracts';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261008-contracts';
 
-const PRACTICE_CHAT_BUILD = '20261008-absent';
+const PRACTICE_CHAT_BUILD = '20261008-contracts';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -64,11 +65,8 @@ const QUESTIONS = [
 
 const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 
-const QUESTION_LABELS = [
-    "[What we did]",
-    "[Progress & Challenges]",
-    "[Practice Goals]"
-];
+// The note's section labels: a contract with the dashboard (note-sections.js).
+const QUESTION_LABELS = NOTE_SECTION_LABELS;
 
 const NOTE_PLACEHOLDER = 'Processed notes will appear here...';
 
@@ -885,6 +883,8 @@ class PracticeChatApp {
             };
 
             this.asrClient.onFinalTranscript = (text) => {
+                // Record what actually produced the text, not what was asked for.
+                if (this.session && this.asrClient?.model) this.session.asrModel = this.asrClient.model;
                 this.currentTranscript = text;
                 this.processCurrentAnswer();
             };

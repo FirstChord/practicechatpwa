@@ -22,6 +22,8 @@
  * what gets sent.
  */
 
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261008-contracts';
+
 const BOLD = /\*\*(?!\s)([^\n*]+?)(?<!\s)\*\*/g;
 const ITALIC = /(^|[^\w*])_(?!\s)([^\n_]+?)(?<!\s)_(?![\w*])/g;
 export const BULLET_PREFIX = '- ';
@@ -169,7 +171,7 @@ export function renderNoteMarkup(text = '') {
 }
 
 // The section labels the app writes, as they look once escaped.
-const EDITOR_SECTION_LABEL = /^\[(?:What we did|Progress &amp; Challenges|Practice Goals)\]$/u;
+const EDITOR_SECTION_LABELS = new Set(NOTE_SECTION_LABELS.map((label) => escapeHtml(label)));
 
 /**
  * Editor HTML: renderNoteMarkup, plus a class on each section-label line so a
@@ -184,7 +186,7 @@ const EDITOR_SECTION_LABEL = /^\[(?:What we did|Progress &amp; Challenges|Practi
 export function renderEditorMarkup(text = '') {
   return renderNoteMarkup(text)
     .split('\n')
-    .map((line) => (EDITOR_SECTION_LABEL.test(line.trim()) ? `<span class="note-label">${line}</span>` : line))
+    .map((line) => (EDITOR_SECTION_LABELS.has(line.trim()) ? `<span class="note-label">${line}</span>` : line))
     .join('\n');
 }
 
