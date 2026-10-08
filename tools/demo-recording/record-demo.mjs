@@ -126,7 +126,7 @@ const OVERLAY = `
       font:600 16px/1.3 'Open Sans',system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);
       transition:opacity .3s ease, transform .3s ease;pointer-events:none}
     #demo-caption.show{opacity:1;transform:translateY(0)}
-    #demo-caption .step{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#3E8D58;font-size:13px}
+    #demo-caption .demo-step{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#3E8D58;font-size:13px}
     #demo-chat{position:fixed;top:0;left:0;right:0;height:186px;box-sizing:border-box;padding:16px 16px 0;z-index:2147483644;display:flex;flex-direction:column;justify-content:center;gap:8px;pointer-events:none;
       background:rgba(236,242,250,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;transition:opacity .3s}
     #demo-chat.on{opacity:1}
@@ -150,7 +150,7 @@ const OVERLAY = `
         r.style.left = x + 'px'; r.style.top = y + 'px'; document.body.appendChild(r); setTimeout(() => r.remove(), 600); },
       caption(text, step) {
         if (!text) { caption.classList.remove('show'); return; }
-        caption.innerHTML = (step ? '<span class="step">' + step + '</span>' : '') + text;
+        caption.innerHTML = (step ? '<span class="demo-step">' + step + '</span>' : '') + text;
         caption.classList.add('show');
       },
       mic() {},
@@ -232,6 +232,12 @@ async function record(frameDir) {
     const caption = (text, step) => page.evaluate(([t, s]) => window.__demo.caption(t, s), [text, step]);
     const pointAt = async (selector) => {
         const el = page.locator(selector).first();
+        try {
+            await el.waitFor({ state: 'visible', timeout: 8000 });
+        } catch (error) {
+            await page.screenshot({ path: path.join(OUT_DIR, 'failed-step.png') });
+            throw new Error(`demo step never became visible: ${selector} (see out/failed-step.png)`);
+        }
         await el.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
         await wait(500);
         const box = await el.boundingBox();
