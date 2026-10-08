@@ -52,9 +52,10 @@ const PRACTICE_CHAT_BUILD = '20261008-italic';
 const QUESTIONS = [
     { lines: ['What did we work on today?'], follow: '' },
     // Two single questions rather than one with "or", so both get answered.
-    // The follow-up steers towards strategy, which the student controls; a
-    // statement, not a third question mark.
-    { lines: ['What went well?', 'What’s still tricky?'], follow: 'Including what made the difference.' },
+    // The follow-up steers towards strategy, which the student controls. A
+    // statement, not a third question mark, and "anything" keeps it optional:
+    // not every lesson has something that clicked.
+    { lines: ['What went well?', 'What’s still tricky?'], follow: 'Anything that helped make things click.' },
     // A plan with a time and place is followed through far more often than a
     // goal alone (implementation intentions, d≈0.65).
     { lines: ['What’s the plan for this week?'], follow: 'What to play, how to practise it, and a time and place to do it.' }
