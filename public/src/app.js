@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-sky';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-sky';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-absent';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-absent';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261008-sky';
+} from './practice-note-sync.js?v=20261008-absent';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261008-sky';
+} from './session-telemetry.js?v=20261008-absent';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,10 +41,10 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261008-sky';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261008-sky';
+} from './note-markup.js?v=20261008-absent';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261008-absent';
 
-const PRACTICE_CHAT_BUILD = '20261008-sky';
+const PRACTICE_CHAT_BUILD = '20261008-absent';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -108,6 +108,8 @@ class PracticeChatApp {
         this.mmsDateConfirmed = false;
         this.mmsWorkflowComplete = false;
         this.mmsExecuteButtonLabel = '';
+        // Absence shortcut from the first screen: attendance only, no note.
+        this.absenceMode = false;
 
         // Six-week evaluation telemetry. Held in memory and sent three times as
         // the session progresses; the note text it measures never travels with
@@ -223,6 +225,8 @@ class PracticeChatApp {
         this.skipBtn = document.getElementById('skipBtn');
         this.backBtn = document.getElementById('backBtn');
         this.typeNotesBtn = document.getElementById('typeNotesBtn');
+        this.absentBtn = document.getElementById('absentBtn');
+        this.absenceBackBtn = document.getElementById('absenceBackBtn');
 
         // Answer display
         this.currentAnswerEl = document.getElementById('currentAnswer');
@@ -415,6 +419,8 @@ class PracticeChatApp {
         this.skipBtn.addEventListener('click', () => this.skipQuestion());
         this.backBtn.addEventListener('click', () => this.previousQuestion());
         this.typeNotesBtn?.addEventListener('click', () => this.startTypedNotes());
+        this.absentBtn?.addEventListener('click', () => this.startAbsence());
+        this.absenceBackBtn?.addEventListener('click', () => this.exitAbsence());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.newBtn.addEventListener('click', () => this.resetForNew());
         this.processedEl.addEventListener('input', () => {
@@ -679,6 +685,38 @@ class PracticeChatApp {
         }
     }
 
+    // Rare (the pause tool usually records absences) but it used to need a
+    // placeholder note typed just to reach the absent option at the end. The
+    // server already records attendance with no note and sends no email.
+    // Always one student: a shared lesson's group is never looked up here, so
+    // one absent child cannot mark the whole lesson absent.
+    startAbsence() {
+        if (this.isRecording) {
+            this.showStatus('Stop the recording before marking the student absent.', 'warning');
+            return;
+        }
+        this.absenceMode = true;
+        this.absenceBackBtn.hidden = false;
+        this.resetMmsTestState();
+        this.selectedMmsAttendanceStatus = 'AbsentNoMakeup';
+        this.attendanceStatusInputs.forEach((input) => {
+            input.checked = input.value === 'AbsentNoMakeup';
+        });
+        this.updateMmsExecuteButtonLabel();
+        this.outputSection.classList.add('absence-mode');
+        this.questionSection.style.display = 'none';
+        this.outputSection.classList.add('show');
+        this.previewMmsTestWrite();
+    }
+
+    exitAbsence() {
+        this.absenceMode = false;
+        this.outputSection.classList.remove('absence-mode', 'show');
+        this.resetMmsTestState();
+        this.questionSection.style.display = 'block';
+        this.updateQuestionDisplay();
+    }
+
     buildTypedNoteTemplate() {
         return QUESTION_LABELS.map((label) => `${label}\n`).join('\n').trim();
     }
@@ -787,6 +825,10 @@ class PracticeChatApp {
 
         // Show/hide back button
         this.backBtn.style.display = this.currentQuestionIndex > 0 ? 'inline-block' : 'none';
+        if (this.absentBtn) {
+            this.absentBtn.hidden = this.currentQuestionIndex > 0
+                || !isLocalMmsWriteTestAvailable({ context: this.context });
+        }
 
         // Show current answer if exists
         const currentAnswer = this.questionAnswers[this.currentQuestionIndex];
@@ -1446,6 +1488,9 @@ class PracticeChatApp {
     }
 
     setMmsExecuteButtonComplete(label = 'Lesson done ✓') {
+        // Once attendance is saved there is no going back to write notes for
+        // the same lesson from here.
+        if (this.absenceBackBtn) this.absenceBackBtn.hidden = true;
         if (!this.mmsExecuteBtn) return;
         this.mmsExecuteBtn.classList.remove('is-loading', 'is-warning');
         this.mmsExecuteBtn.classList.add('is-complete');
@@ -1651,8 +1696,8 @@ class PracticeChatApp {
 
     async previewMmsTestWrite() {
         if (this.mmsTestInFlight) return;
-        const noteText = this.getCurrentNoteText();
-        if (!noteText) return;
+        const noteText = this.absenceMode ? '' : this.getCurrentNoteText();
+        if (!noteText && !this.absenceMode) return;
 
         this.mmsTestInFlight = true;
         this.mmsExecuteBtn.disabled = true;
@@ -1676,7 +1721,7 @@ class PracticeChatApp {
             this.renderMmsPreview(preview);
             // Asked after the preview renders, so a slow or failing group lookup
             // never delays or breaks the ordinary one-student flow.
-            await this.loadLessonGroup(noteText);
+            if (!this.absenceMode) await this.loadLessonGroup(noteText);
         } catch (error) {
             console.error('MMS test preview failed:', error);
             this.showStatus(error.message || 'MMS test preview failed', 'error');
@@ -1736,7 +1781,7 @@ class PracticeChatApp {
     }
 
     isGroupDelivery() {
-        return Boolean(this.lessonGroup?.isGroup && this.groupDeliveryChosen);
+        return !this.absenceMode && Boolean(this.lessonGroup?.isGroup && this.groupDeliveryChosen);
     }
 
     async executeGroupWrite(noteText) {
@@ -1808,10 +1853,10 @@ class PracticeChatApp {
 
     async executeMmsTestWrite() {
         if (this.mmsTestInFlight) return;
-        const noteText = this.getCurrentNoteText();
+        const noteText = this.absenceMode ? '' : this.getCurrentNoteText();
         const targetAttendanceId = this.selectedMmsAttendanceId || '';
         let finalButtonHandled = false;
-        if (!noteText || !targetAttendanceId) {
+        if ((!noteText && !this.absenceMode) || !targetAttendanceId) {
             this.showStatus('Confirm the lesson date first', 'warning');
             return;
         }
@@ -1965,7 +2010,8 @@ class PracticeChatApp {
         this.songSelectionLocked = false;
         this.renderSongChoices();
         this.processedEl.textContent = NOTE_PLACEHOLDER;
-        this.outputSection.classList.remove('show');
+        this.absenceMode = false;
+        this.outputSection.classList.remove('show', 'absence-mode');
         this.questionSection.style.display = 'block';
 
         localStorage.removeItem('lastNotes');
@@ -1985,7 +2031,8 @@ class PracticeChatApp {
         this.songSelectionLocked = false;
         this.renderSongChoices();
         this.processedEl.textContent = NOTE_PLACEHOLDER;
-        this.outputSection.classList.remove('show');
+        this.absenceMode = false;
+        this.outputSection.classList.remove('show', 'absence-mode');
         this.questionSection.style.display = 'block';
 
         // Reset copy button

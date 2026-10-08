@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css?v=20261008-sky">
+    <link rel="stylesheet" href="/css/styles.css?v=20261008-absent">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -71,6 +71,9 @@
                 <button id="typeNotesBtn" class="btn-link type-notes-link">
                     Type notes instead
                 </button>
+                <button id="absentBtn" class="btn-link absent-link" hidden>
+                    Student absent?
+                </button>
                 <button id="skipBtn" class="btn-link">
                     Skip question →
                 </button>
@@ -80,9 +83,14 @@
         <!-- Output Section -->
         <div id="outputSection" class="output-section">
             <div class="card">
-                <h3 class="card-subtitle">Review Lesson Notes</h3>
-                <p class="review-helper">This is the note that will be sent. Change anything you like.</p>
-                <div class="note-toolbar" role="toolbar" aria-label="Formatting" aria-controls="processed">
+                <!-- Absence shortcut from the first screen: attendance only. -->
+                <div class="absence-head">
+                    <h3 class="card-subtitle">Student absent today</h3>
+                    <p class="review-helper">Marks this lesson absent in MMS. No practice notes are sent.</p>
+                </div>
+                <h3 class="card-subtitle note-only">Review Lesson Notes</h3>
+                <p class="review-helper note-only">This is the note that will be sent. Change anything you like.</p>
+                <div class="note-toolbar note-only" role="toolbar" aria-label="Formatting" aria-controls="processed">
                     <button type="button" class="note-tool" data-format="bold" aria-pressed="false" title="Bold (Cmd/Ctrl+B)">
                         <span class="note-tool-glyph note-tool-glyph-bold" aria-hidden="true">B</span><span class="sr-only">Bold</span>
                     </button>
@@ -102,11 +110,11 @@
                         </svg><span class="sr-only">Bullet list</span>
                     </button>
                 </div>
-                <div id="processed" class="output-box" contenteditable="true" spellcheck="true" aria-label="Editable lesson notes">
+                <div id="processed" class="output-box note-only" contenteditable="true" spellcheck="true" aria-label="Editable lesson notes">
                     Processed notes will appear here...
                 </div>
 
-                <fieldset id="songLinkPanel" class="song-link-panel" hidden>
+                <fieldset id="songLinkPanel" class="song-link-panel note-only" hidden>
                     <legend>Songs in this lesson</legend>
                     <p>Tick any songs you worked on.</p>
                     <div id="songSuggestionSection" class="song-choice-section" hidden>
@@ -156,7 +164,7 @@
                     ago. What survives is the affordance itself.
                 -->
                 <div id="mmsTestPanel" class="mms-test-panel" style="display: none;">
-                    <fieldset class="attendance-choice" aria-label="Attendance status">
+                    <fieldset class="attendance-choice note-only" aria-label="Attendance status">
                         <legend>Attendance</legend>
                         <label>
                             <input type="radio" name="attendanceStatus" value="Present" checked>
@@ -207,8 +215,11 @@
 
                 <!-- Secondary Actions -->
                 <div class="secondary-actions">
-                    <button id="newBtn" class="btn-link">
+                    <button id="newBtn" class="btn-link note-only">
                         ✨ New Recording
+                    </button>
+                    <button id="absenceBackBtn" class="btn-link absence-only" type="button">
+                        ← Back to the questions
                     </button>
                 </div>
             </div>
@@ -228,7 +239,7 @@
     </div>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20261008-sky"></script>
+    <script type="module" src="/src/app.js?v=20261008-absent"></script>
 
     <!-- Service Worker Registration -->
     <script>

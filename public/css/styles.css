@@ -1708,6 +1708,25 @@ textarea {
     margin-top: 14px;
 }
 
+/* Absence shortcut: the same final screen with only the attendance parts. */
+.absence-head,
+.absence-only {
+    display: none;
+}
+
+.output-section.absence-mode .absence-head,
+.output-section.absence-mode .absence-only {
+    display: block;
+}
+
+.output-section.absence-mode .note-only {
+    display: none !important;
+}
+
+.output-section.absence-mode .absence-only[hidden] {
+    display: none;
+}
+
 /* Songs: the same green accent as everything else, in place of the purple. */
 .song-choice input[type="checkbox"] {
     accent-color: var(--primary-color);
