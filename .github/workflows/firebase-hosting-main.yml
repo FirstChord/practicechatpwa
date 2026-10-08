@@ -23,6 +23,17 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # What the screens do, in a real browser against a fake dashboard and a
+      # fake microphone. Only Playwright is installed (package-lock.json is
+      # not committed, and the other dev tools are not needed here).
+      - name: Install browser for tests
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:browser
+
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 

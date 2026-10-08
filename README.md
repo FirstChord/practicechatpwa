@@ -299,7 +299,9 @@ practice-chat/
 ### Making Changes
 1. Edit files in `public/`, on `main`
 2. Bump the `?v=` stamp everywhere and `CACHE_NAME` in `service-worker.js`
-3. Run tests: `npm test`
+3. Run tests: `npm test` (helpers) and `npm run test:browser` (the screens, in
+   a real browser against a fake dashboard and microphone; needs Google Chrome
+   locally). Both run on GitHub before every deploy.
 4. Test locally: `python3 -m http.server 8000 --directory public`
 5. Deploy: commit and `git push`. `.github/workflows/firebase-hosting-main.yml`
    runs the tests and deploys only if they pass. A manual
