@@ -1533,6 +1533,40 @@ textarea {
     border-top: none;
 }
 
+/* While transcribing: one small bold line under the button, dark green with a
+   soft light sweeping across it. No box until the answer arrives. */
+.processing-message {
+    display: block;
+    width: fit-content;
+    margin: 18px 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: linear-gradient(100deg, #1F3B2A 0%, #1F3B2A 38%, #9FD3B0 50%, #1F3B2A 62%, #1F3B2A 100%);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: processing-sweep 2.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.processing-message[hidden] {
+    display: none;
+}
+
+@keyframes processing-sweep {
+    from { background-position: 100% 0; }
+    to { background-position: -50% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .processing-message {
+        animation: none;
+        background: none;
+        color: #1F3B2A;
+    }
+}
+
 /* --- Review ---------------------------------------------------------------- */
 
 .card-subtitle {

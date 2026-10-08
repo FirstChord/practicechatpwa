@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-refresh-2';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-refresh-2';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261008-shimmer';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261008-shimmer';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261008-refresh-2';
+} from './practice-note-sync.js?v=20261008-shimmer';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261008-refresh-2';
+} from './session-telemetry.js?v=20261008-shimmer';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,9 +41,9 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261008-refresh-2';
+} from './note-markup.js?v=20261008-shimmer';
 
-const PRACTICE_CHAT_BUILD = '20261008-refresh-2';
+const PRACTICE_CHAT_BUILD = '20261008-shimmer';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -221,6 +221,7 @@ class PracticeChatApp {
 
         // Answer display
         this.currentAnswerEl = document.getElementById('currentAnswer');
+        this.processingMessageEl = document.getElementById('processingMessage');
 
         // Output elements
         this.copyBtn = document.getElementById('copyBtn');
@@ -721,7 +722,14 @@ class PracticeChatApp {
         }
     }
 
+    // Empty text hides it.
+    setProcessingMessage(text = '') {
+        this.processingMessageEl.textContent = text;
+        this.processingMessageEl.hidden = !text;
+    }
+
     updateQuestionDisplay() {
+        this.setProcessingMessage('');
         const question = QUESTIONS[this.currentQuestionIndex];
         this.questionTextEl.replaceChildren(...question.lines.map((line) => {
             const span = document.createElement('span');
@@ -784,10 +792,11 @@ class PracticeChatApp {
             });
 
             // Set up callbacks
+            // The client only sends a partial once, on stop: one of its
+            // processing lines, shown as a shimmer until the answer replaces it.
             this.asrClient.onPartialTranscript = (text) => {
-                // Show fun processing messages
-                this.currentAnswerEl.textContent = text;
-                this.currentAnswerEl.style.display = 'block';
+                this.currentAnswerEl.style.display = 'none';
+                this.setProcessingMessage(text);
             };
 
             this.asrClient.onFinalTranscript = (text) => {
@@ -796,6 +805,7 @@ class PracticeChatApp {
             };
 
             this.asrClient.onError = (error) => {
+                this.setProcessingMessage('');
                 recordAsrError(this.session, this.currentQuestionIndex);
                 this.showStatus(`Error: ${error.message}`, 'error');
                 this.isRecording = false;
@@ -847,6 +857,7 @@ class PracticeChatApp {
 
         } catch (error) {
             console.error('Failed to process recording:', error);
+            this.setProcessingMessage('');
             recordAsrError(this.session, this.currentQuestionIndex);
             this.showStatus(`Processing failed: ${error.message}`, 'error');
             this.isRecording = false;
@@ -862,6 +873,7 @@ class PracticeChatApp {
     processCurrentAnswer() {
         // Length only — the transcript itself never leaves the browser.
         transcriptReceived(this.session, this.currentQuestionIndex, this.currentTranscript);
+        this.setProcessingMessage('');
 
         if (!this.currentTranscript.trim()) {
             this.showStatus('No answer recorded', 'warning');

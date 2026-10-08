@@ -43,19 +43,24 @@ export function resolveAsrModel(search = '') {
 }
 
 // Fun processing messages while transcribing
+// Shown in a shimmering line while the answer is transcribed. No emojis: the
+// lines from the original set that stood up without one were kept, the rest
+// replaced with quieter musical ones.
 const PROCESSING_MESSAGES = [
-    "🐺 A pack of wolves are raising your notes...",
-    "🍳 Making a note omelette...",
-    "📝 Taking note of your notes",
-    "🎭 Dramatic pause...",
-    "🔮 Consulting the crystal ball of transcription...",
-    "🚀 Launching words into orbit...",
-    "🧙‍♂️ Casting spelling spells...",
-    "🎪 Training circus words to perform...",
-    "🍕 Adding extra cheese to your notes...",
-    "🦄 Unicorns are polishing your words...",
-    "🎵 Walking 500 miles...",
-    "✨ Processing how incredibly good your notes are..."
+    "Taking note of your notes…",
+    "Dramatic pause…",
+    "Consulting the crystal ball of transcription…",
+    "Casting spelling spells…",
+    "Walking 500 miles…",
+    "Processing how incredibly good your notes are…",
+    "Tuning up the transcript…",
+    "Finding the downbeat…",
+    "Counting it in…",
+    "Writing it all down…",
+    "Turning the page…",
+    "Tidying the bar lines…",
+    "Listening back…",
+    "Polishing the phrasing…"
 ];
 
 function getRandomProcessingMessage() {

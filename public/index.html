@@ -11,7 +11,7 @@
 
     <title>First Chord: Practice Chat</title>
 
-    <link rel="stylesheet" href="/css/styles.css?v=20261008-refresh-2">
+    <link rel="stylesheet" href="/css/styles.css?v=20261008-shimmer">
     <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nexa+Black:wght@400;700;900&display=swap" rel="stylesheet">
@@ -57,6 +57,8 @@
                     <span id="mainActionText">Start recording</span>
                     <span id="mainActionHint" class="btn-hint"></span>
                 </button>
+
+                <p id="processingMessage" class="processing-message" aria-live="polite" hidden></p>
 
                 <div id="currentAnswer" class="answer-box" style="display: none;">
                     Your answer will appear here...
@@ -215,7 +217,7 @@
     </main>
 
     <!-- Scripts -->
-    <script type="module" src="/src/app.js?v=20261008-refresh-2"></script>
+    <script type="module" src="/src/app.js?v=20261008-shimmer"></script>
 
     <!-- Service Worker Registration -->
     <script>

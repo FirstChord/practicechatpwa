@@ -3,17 +3,17 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v35-refresh';
+const CACHE_NAME = 'practice-chat-v36-shimmer';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261008-refresh-2',
-  '/src/app.js?v=20261008-refresh-2',
-  '/src/practice-note-sync.js?v=20261008-refresh-2',
-  '/src/note-markup.js?v=20261008-refresh-2',
+  '/css/styles.css?v=20261008-shimmer',
+  '/src/app.js?v=20261008-shimmer',
+  '/src/practice-note-sync.js?v=20261008-shimmer',
+  '/src/note-markup.js?v=20261008-shimmer',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
