@@ -52,6 +52,17 @@ function getRandomProcessingMessage() {
 // before recording starts, so nobody talks for two minutes into a dead end.
 export const NO_DASHBOARD_MESSAGE = 'Voice notes need Practice Chat opened from the dashboard. Use “Type notes instead”.';
 
+// Chrome records webm/opus; Safari (the iPad) only records mp4. Naming a format
+// the browser lacks throws "mimeType is not supported", so ask which it has and
+// fall back to letting the browser choose. The dashboard reads the format from
+// the blob's type.
+const RECORDER_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+
+export function pickRecorderMimeType(recorder = globalThis.MediaRecorder) {
+    if (typeof recorder?.isTypeSupported !== 'function') return '';
+    return RECORDER_MIME_TYPES.find((type) => recorder.isTypeSupported(type)) || '';
+}
+
 /**
  * POST recorded audio to the dashboard's transcription route; resolve to text.
  */
@@ -66,7 +77,7 @@ export async function transcribeViaDashboard({
     if (!dashboardBaseUrl) throw new Error(NO_DASHBOARD_MESSAGE);
 
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', audioBlob, 'audio');
     formData.append('model', model);
     if (prompt) formData.append('prompt', prompt);
 
@@ -128,9 +139,8 @@ export class WhisperASRClient {
             });
 
             // Set up MediaRecorder
-            this.mediaRecorder = new MediaRecorder(this.mediaStream, {
-                mimeType: 'audio/webm;codecs=opus'
-            });
+            const mimeType = pickRecorderMimeType();
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, mimeType ? { mimeType } : undefined);
 
             this.audioChunks = [];
             this.isRecording = true;
@@ -180,7 +190,7 @@ export class WhisperASRClient {
 
                         // Create audio blob
                         const audioBlob = new Blob(this.audioChunks, {
-                            type: 'audio/webm;codecs=opus'
+                            type: this.mediaRecorder?.mimeType || this.audioChunks[0].type || 'audio/webm'
                         });
                         console.log('📦 Audio blob created, size:', audioBlob.size, 'bytes');
 

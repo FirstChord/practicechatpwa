@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { NO_DASHBOARD_MESSAGE, transcribeViaDashboard, WhisperASRClient } from '../public/src/asr-client.js';
+import { NO_DASHBOARD_MESSAGE, pickRecorderMimeType, transcribeViaDashboard, WhisperASRClient } from '../public/src/asr-client.js';
 
 // The browser sends audio to the dashboard and gets text back. It must never
 // again hold an OpenAI key: that was the relay's /api-key, which gave the raw
@@ -83,4 +83,12 @@ test('no browser module fetches an API key or calls OpenAI directly', () => {
     assert.doesNotMatch(source, /\/api-key/, `${file} fetches an API key`);
     assert.doesNotMatch(source, /Bearer /, `${file} sends a bearer token`);
   }
+});
+
+test('records in whichever format the browser supports, so Safari gets mp4 not webm', () => {
+  const only = (...types) => ({ isTypeSupported: (type) => types.includes(type) });
+  assert.equal(pickRecorderMimeType(only('audio/webm;codecs=opus', 'audio/webm')), 'audio/webm;codecs=opus');
+  assert.equal(pickRecorderMimeType(only('audio/mp4')), 'audio/mp4');
+  assert.equal(pickRecorderMimeType(only()), '');
+  assert.equal(pickRecorderMimeType({}), '');
 });
