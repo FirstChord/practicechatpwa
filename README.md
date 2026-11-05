@@ -181,7 +181,7 @@ Once deployed, users can install the app:
 - **Mobile**: Works on all modern mobile browsers ✅
 
 ### Storage
-- **localStorage**: Saves last notes (clears after 24 hours)
+- **localStorage**: Keeps an unsaved draft per student on this device (answers so far and the edited note), restored when the panel reopens for that student. Cleared once the note is sent, saved or copied, on New, and after 24 hours. It never leaves the browser.
 - **Dashboard snapshot**: When opened from a dashboard student link, clicking `Take Attendance` sends a best-effort copy to the dashboard `Practice_Notes_Log` tab before opening MMS
 - **Song links**: The dashboard supplies the student's current shelf plus public catalogue metadata. Exact, deterministic note matches are shown only as proposals; a tutor must select them before save. Ambiguous duplicate titles are suppressed, one-word titles need a song-work cue, and anything outside the catalogue stays explicitly unlisted for later review.
 - **MMS remains completion truth**: Tutors still mark attendance and send parent notes manually in MMS

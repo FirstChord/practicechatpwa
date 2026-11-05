@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261021-recorder';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261021-recorder';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261105-drafts';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261105-drafts';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -15,7 +15,7 @@ import {
     savePracticeChatSession,
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261021-recorder';
+} from './practice-note-sync.js?v=20261105-drafts';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +33,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261021-recorder';
+} from './session-telemetry.js?v=20261105-drafts';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,11 +41,12 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261021-recorder';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261021-recorder';
-import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261021-recorder';
+} from './note-markup.js?v=20261105-drafts';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261105-drafts';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261105-drafts';
+import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261105-drafts';
 
-const PRACTICE_CHAT_BUILD = '20261021-recorder';
+const PRACTICE_CHAT_BUILD = '20261105-drafts';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -124,12 +125,17 @@ class PracticeChatApp {
         this.generatedNoteText = '';
         // The phase the server has actually been told about.
         this.sentPhase = '';
+        // Set once the note has gone somewhere, so a late save cannot bring a
+        // delivered note back as a draft.
+        this.noteDelivered = false;
+        this.draftSaveTimer = null;
 
         this.initializeElements();
         this.bindEvents();
         this.updateQuestionDisplay();
         this.configureMmsTestPanel();
         this.loadTranscriptionPrompt();
+        this.restoreDraft();
         this.sendSessionTelemetry();
         this.bindSessionFlush();
         this.applyTimeOfDaySky();
@@ -424,7 +430,10 @@ class PracticeChatApp {
         this.processedEl.addEventListener('input', () => {
             this.refreshSongSuggestions();
             this.syncToolbarState();
+            this.scheduleDraftSave();
         });
+        // The panel closing is the moment a draft is most likely to be lost.
+        window.addEventListener('pagehide', () => this.persistDraft());
         this.bindNoteToolbar();
         // A change listener, not a delegated click: clicking a label fires a
         // click on the label AND a synthesised one on the input it wraps, so
@@ -971,6 +980,7 @@ class PracticeChatApp {
 
         // Store the answer for this question
         this.questionAnswers[this.currentQuestionIndex] = result.text;
+        this.persistDraft();
 
         // Display the answer
         this.currentAnswerEl.textContent = result.text;
@@ -996,6 +1006,7 @@ class PracticeChatApp {
             this.currentQuestionIndex++;
             markStep(this.session, this.currentQuestionIndex);
             this.updateQuestionDisplay();
+            this.persistDraft();
         } else {
             this.finishRecording();
         }
@@ -1011,6 +1022,7 @@ class PracticeChatApp {
             markStep(this.session, this.currentQuestionIndex);
             this.questionAnswers[this.currentQuestionIndex] = '';
             this.updateQuestionDisplay();
+            this.persistDraft();
         }
     }
 
@@ -1019,6 +1031,7 @@ class PracticeChatApp {
             this.currentQuestionIndex++;
             markStep(this.session, this.currentQuestionIndex);
             this.updateQuestionDisplay();
+            this.persistDraft();
         }
     }
 
@@ -1031,7 +1044,7 @@ class PracticeChatApp {
 
         // Show output section
         this.outputSection.classList.add('show');
-
+        this.persistDraft();
 
         markPhase(this.session, 'note_generated');
         this.sendSessionTelemetry();
@@ -1072,9 +1085,6 @@ class PracticeChatApp {
         // The baseline an edit is measured against: what the app produced,
         // before the tutor touched it.
         this.generatedNoteText = output.trim();
-
-        // Save to localStorage
-        this.saveNotes(output.trim());
     }
 
     /**
@@ -1157,6 +1167,12 @@ class PracticeChatApp {
      * tutor's student is on.
      */
     finishSession(outcome, { noteId = '' } = {}) {
+        // Every outcome here means the note went somewhere: sent, saved, or on
+        // the clipboard. It is no longer a draft.
+        this.noteDelivered = true;
+        window.clearTimeout(this.draftSaveTimer);
+        clearDraft(this.draftStorage(), this.context.studentId);
+
         if (!this.session) return;
 
         measureEdit(this.session, {
@@ -2014,8 +2030,7 @@ class PracticeChatApp {
         this.outputSection.classList.remove('show', 'absence-mode');
         this.questionSection.style.display = 'block';
 
-        localStorage.removeItem('lastNotes');
-        localStorage.removeItem('lastNotesTimestamp');
+        this.discardDraft();
 
         this.updateQuestionDisplay();
         this.showStatus('Notes cleared', 'info');
@@ -2037,6 +2052,7 @@ class PracticeChatApp {
 
         // Reset copy button
         this.resetMmsTestState();
+        this.discardDraft();
 
         // Hide attendance reminder
         const reminderEl = document.getElementById('attendanceReminder');
@@ -2048,36 +2064,69 @@ class PracticeChatApp {
         this.showStatus('Ready for new recording', 'info');
     }
 
-    saveNotes(text) {
+    draftStorage() {
+        // Reading `localStorage` itself throws where storage is blocked.
         try {
-            localStorage.setItem('lastNotes', text);
-            localStorage.setItem('lastNotesTimestamp', Date.now().toString());
-            console.log('✅ Notes saved to localStorage');
-        } catch (error) {
-            console.error('Failed to save notes:', error);
+            return window.localStorage;
+        } catch {
+            return null;
         }
     }
 
-    loadPreviousNotes() {
-        try {
-            const lastNotes = localStorage.getItem('lastNotes');
-            const timestamp = localStorage.getItem('lastNotesTimestamp');
+    // Keep what the tutor has so far, on this device, for this student only.
+    persistDraft() {
+        window.clearTimeout(this.draftSaveTimer);
+        if (this.noteDelivered || this.absenceMode) return;
+        const onReview = this.outputSection.classList.contains('show') && !this.isNotePlaceholder();
+        let note = onReview ? this.readNoteMarkup() : '';
+        // An untouched typed-notes template is not worth offering back.
+        if (note.trim() === this.buildTypedNoteTemplate()) note = '';
+        writeDraft(this.draftStorage(), this.context.studentId, {
+            answers: this.questionAnswers,
+            questionIndex: this.currentQuestionIndex,
+            note,
+            generatedNote: note ? this.generatedNoteText : ''
+        });
+    }
 
-            if (lastNotes && timestamp) {
-                const ageHours = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
+    scheduleDraftSave() {
+        window.clearTimeout(this.draftSaveTimer);
+        this.draftSaveTimer = window.setTimeout(() => this.persistDraft(), 400);
+    }
 
-                // Only load if less than 24 hours old
-                if (ageHours < 24) {
-                    // A saved draft is markup, so restore it as formatting
-                    // rather than as visible asterisks.
-                    this.setNoteContent(lastNotes);
-                    this.outputSection.classList.add('show');
-                    this.showStatus(`Previous notes loaded (${Math.round(ageHours)}h ago)`, 'info');
-                }
+    discardDraft() {
+        window.clearTimeout(this.draftSaveTimer);
+        this.noteDelivered = false;
+        clearDraft(this.draftStorage(), this.context.studentId);
+    }
+
+    // Reopening the panel for a student whose note was never saved puts the
+    // tutor back where they left off: on the review screen, or mid-questions.
+    restoreDraft() {
+        const storage = this.draftStorage();
+        pruneDrafts(storage);
+        const draft = readDraft(storage, this.context.studentId);
+        if (!draft) return;
+
+        this.questionAnswers = [...draft.answers];
+        if (draft.note.trim()) {
+            this.currentQuestionIndex = 2;
+            this.setNoteContent(draft.note);
+            this.generatedNoteText = draft.generatedNote || stripNoteMarkers(draft.note);
+            this.questionSection.style.display = 'none';
+            this.outputSection.classList.add('show');
+            this.refreshSongSuggestions();
+            markPhase(this.session, 'note_generated');
+            if (isLocalMmsWriteTestAvailable({ context: this.context })) {
+                this.previewMmsTestWrite();
             }
-        } catch (error) {
-            console.error('Failed to load previous notes:', error);
+        } else {
+            this.currentQuestionIndex = draft.questionIndex;
+            this.updateQuestionDisplay();
         }
+
+        const savedAt = new Date(draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        this.showStatus(`Unsaved note from ${savedAt} restored.`, 'info');
     }
 
     clearStatus() {

@@ -211,3 +211,74 @@ test('another element with class "step" on the page does not break the questions
     assert.deepEqual(errors, []);
     await close();
 });
+
+// The panel closing before the note is saved used to lose it for good.
+const reopen = async (page) => {
+    // Module scripts run before `load`, which reload() waits for. The record
+    // button is hidden when the review screen comes back, so it is no signal.
+    await page.reload();
+};
+
+test('closing the panel mid-questions keeps the answers for next time', async () => {
+    const { page, errors, close } = await openApp(server);
+    await answer(page, 'We worked on scales.');
+    await page.click('#mainActionBtn');
+    await answer(page, 'The chorus went well.');
+    await reopen(page);
+    assert.match(await page.locator('.question-block.is-current').innerText(), /What went well/);
+    assert.equal(await page.locator('#currentAnswer').innerText(), 'The chorus went well.');
+    assert.match(await page.locator('#status').innerText(), /Unsaved note from .* restored/);
+    assert.deepEqual(errors, []);
+    await close();
+});
+
+test('an edited note on the review screen comes back exactly as left, until New', async () => {
+    const { page, errors, close } = await openApp(server);
+    await completeQuestions(page, ['Scales.', 'Good.', 'Slowly.']);
+    await page.click('#processed');
+    await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('processed'));
+        range.collapse(false);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+    });
+    await page.keyboard.type(' Every day.');
+    const edited = await savedNote(page);
+    assert.match(edited, /Every day\.$/);
+
+    await reopen(page);
+    assert.ok(await visible(page, '#processed'));
+    assert.equal(await savedNote(page), edited);
+
+    await page.click('#newBtn');
+    await reopen(page);
+    assert.equal(await visible(page, '#processed'), false);
+    assert.equal(await page.locator('#currentAnswer').isVisible(), false);
+    assert.deepEqual(errors, []);
+    await close();
+});
+
+test('a sent note is not offered again, and a draft never crosses to another student', async () => {
+    const { page, close } = await openApp(server);
+    await completeQuestions(page);
+    // Another student's panel on the same device: nothing restored.
+    const url = new URL(page.url());
+    url.searchParams.set('studentId', 'sdt_TEST02');
+    await page.goto(url.toString());
+    await page.locator('#mainActionBtn').waitFor();
+    assert.equal(await visible(page, '#processed'), false);
+
+    // Back to the first student: restored, then sent, then gone.
+    url.searchParams.set('studentId', 'sdt_TEST01');
+    await page.goto(url.toString());
+    await page.locator('#processed').waitFor({ state: 'visible' });
+    await page.click('#mmsDateConfirm');
+    await page.click('#mmsExecuteBtn');
+    await page.click('#sendRecipientConfirm');
+    await page.click('.action-confirm-primary');
+    await page.waitForFunction(() => document.getElementById('mmsExecuteBtn').textContent.includes('Lesson done'));
+    await reopen(page);
+    assert.equal(await visible(page, '#processed'), false);
+    await close();
+});
