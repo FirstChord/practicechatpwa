@@ -216,14 +216,17 @@ export function buildPracticeNoteSnapshot({
 export async function fetchPracticeChatMusicContext({
     dashboardBaseUrl = '',
     studentId = '',
+    tutor = '',
     practiceChatSecret = '',
     fetchImpl = fetch
 } = {}) {
     if (!dashboardBaseUrl || !studentId) {
-        return { prompt: '', songs: [], catalogueSongs: [], songTitles: [], instrument: '' };
+        return { prompt: '', songs: [], catalogueSongs: [], songTitles: [], instrument: '', tidy: false };
     }
 
-    const url = `${dashboardBaseUrl}/api/practice-notes/music-context?studentId=${encodeURIComponent(studentId)}`;
+    const params = new URLSearchParams({ studentId });
+    if (clean(tutor)) params.set('tutor', clean(tutor));
+    const url = `${dashboardBaseUrl}/api/practice-notes/music-context?${params.toString()}`;
     const response = await fetchImpl(url, {
         method: 'GET',
         headers: {
@@ -256,8 +259,38 @@ export async function fetchPracticeChatMusicContext({
             .filter((song) => song.songId && song.title)
             .slice(0, 400) : [],
         songTitles: payload.songTitles || [],
-        instrument: payload.instrument || ''
+        instrument: payload.instrument || '',
+        // The dashboard decides who sees Tidy and says only yes or no.
+        tidy: payload.tidy === true
     };
+}
+
+/**
+ * Ask the dashboard to tidy the note. It swaps names out before the model sees
+ * the note and puts them back after, and refuses any edit that changed a fact,
+ * so a failure always means the tutor keeps their own note.
+ */
+export async function tidyPracticeNoteText({
+    dashboardBaseUrl = '',
+    studentId = '',
+    tutor = '',
+    text = '',
+    practiceChatSecret = '',
+    fetchImpl = fetch
+} = {}) {
+    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/tidy`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
+        },
+        body: JSON.stringify({ studentId, tutor, text })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || typeof payload.text !== 'string' || !payload.text.trim()) {
+        throw new Error(payload.error || 'Tidy is unavailable right now. Your note is unchanged.');
+    }
+    return { text: payload.text, speakersAdded: payload.speakersAdded === true };
 }
 
 export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot = {}, fetchImpl = fetch } = {}) {

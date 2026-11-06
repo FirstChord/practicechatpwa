@@ -282,3 +282,55 @@ test('a sent note is not offered again, and a draft never crosses to another stu
     assert.equal(await visible(page, '#processed'), false);
     await close();
 });
+
+test('Tidy shows only when the dashboard offers it, replaces the note, and Undo puts it back', async () => {
+    const hidden = await openApp(server);
+    await completeQuestions(hidden.page, ['Scales.', 'Good.', 'Slowly.']);
+    assert.equal(await visible(hidden.page, '#tidyNoteBtn'), false);
+    await hidden.close();
+
+    const api = (key, body) => {
+        if (key === 'music-context') return { songs: [], catalogueSongs: [], tidy: true };
+        if (key === 'tidy') return { text: body.text.replace('Scales.', 'Scales and arpeggios.'), speakersAdded: true };
+        return key === 'group' ? { isGroup: false } : { ok: true };
+    };
+    const { page, calls, errors, close } = await openApp(server, { api });
+    await completeQuestions(page, ['Scales.', 'Good.', 'Slowly.']);
+    const original = await savedNote(page);
+
+    await page.click('#tidyNoteBtn');
+    await page.locator('#tidyNoteBtn', { hasText: 'Undo tidy' }).waitFor();
+    assert.match(await savedNote(page), /Scales and arpeggios\./);
+    assert.equal(calls.find((call) => call.key === 'tidy').text, original);
+    assert.match(await page.locator('#status').textContent(), /Check who said what/);
+
+    await page.click('#tidyNoteBtn');
+    assert.equal(await savedNote(page), original);
+    assert.equal(await page.locator('#tidyNoteBtn').textContent(), 'Tidy');
+
+    // Typing after a tidy drops the undo, so it can never erase later edits.
+    await page.click('#tidyNoteBtn');
+    await page.locator('#tidyNoteBtn', { hasText: 'Undo tidy' }).waitFor();
+    await page.click('#processed');
+    await page.keyboard.type(' x');
+    assert.equal(await page.locator('#tidyNoteBtn').textContent(), 'Tidy');
+    assert.deepEqual(errors, []);
+    await close();
+});
+
+test('a refused tidy leaves the note exactly as it was', async () => {
+    const api = (key) => {
+        if (key === 'music-context') return { songs: [], catalogueSongs: [], tidy: true };
+        if (key === 'tidy') return { error: 'Tidy changed too much, so your note is unchanged.', code: 'failed_checks' };
+        return key === 'group' ? { isGroup: false } : { ok: true };
+    };
+    const { page, errors, close } = await openApp(server, { api });
+    await completeQuestions(page, ['Scales.', 'Good.', 'Slowly.']);
+    const original = await savedNote(page);
+    await page.click('#tidyNoteBtn');
+    await page.locator('#status', { hasText: 'changed too much' }).waitFor();
+    assert.equal(await savedNote(page), original);
+    assert.equal(await page.locator('#tidyNoteBtn').textContent(), 'Tidy');
+    assert.deepEqual(errors, []);
+    await close();
+});

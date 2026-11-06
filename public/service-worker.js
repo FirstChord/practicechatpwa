@@ -3,20 +3,20 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v42-drafts';
+const CACHE_NAME = 'practice-chat-v43-tidy';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261105-drafts',
-  '/src/app.js?v=20261105-drafts',
-  '/src/practice-note-sync.js?v=20261105-drafts',
-  '/src/note-markup.js?v=20261105-drafts',
-  '/src/time-of-day-sky.js?v=20261105-drafts',
-  '/src/note-sections.js?v=20261105-drafts',
-  '/src/note-draft.js?v=20261105-drafts',
+  '/css/styles.css?v=20261106-tidy',
+  '/src/app.js?v=20261106-tidy',
+  '/src/practice-note-sync.js?v=20261106-tidy',
+  '/src/note-markup.js?v=20261106-tidy',
+  '/src/time-of-day-sky.js?v=20261106-tidy',
+  '/src/note-sections.js?v=20261106-tidy',
+  '/src/note-draft.js?v=20261106-tidy',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'

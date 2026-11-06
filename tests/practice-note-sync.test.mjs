@@ -14,7 +14,8 @@ import {
   savePracticeChatSession,
   savePracticeNoteSnapshot,
   splitStructuredNoteText,
-  suggestPracticeNoteSongs
+  suggestPracticeNoteSongs,
+  tidyPracticeNoteText
 } from '../public/src/practice-note-sync.js';
 
 test('getPracticeChatContext reads dashboard handoff query params', () => {
@@ -228,6 +229,53 @@ test('fetchPracticeChatMusicContext preserves exact song objects for selection',
 
   assert.deepEqual(context.songs, [{ songId: 'fc_song_a', title: 'Ho Hey', status: 'working' }]);
   assert.equal(context.catalogueSongs.length, 2);
+});
+
+test('fetchPracticeChatMusicContext sends the tutor and reads only a yes for Tidy', async () => {
+  const urls = [];
+  const reply = (tidy) => async (url) => {
+    urls.push(url);
+    return { ok: true, json: async () => ({ prompt: '', songs: [], tidy }) };
+  };
+  const on = await fetchPracticeChatMusicContext({ dashboardBaseUrl: 'https://dashboard.example', studentId: 'sdt_abc', tutor: 'Dean', fetchImpl: reply(true) });
+  const odd = await fetchPracticeChatMusicContext({ dashboardBaseUrl: 'https://dashboard.example', studentId: 'sdt_abc', fetchImpl: reply('yes') });
+
+  assert.equal(on.tidy, true);
+  assert.equal(odd.tidy, false);
+  assert.equal(urls[0], 'https://dashboard.example/api/practice-notes/music-context?studentId=sdt_abc&tutor=Dean');
+  assert.equal(urls[1], 'https://dashboard.example/api/practice-notes/music-context?studentId=sdt_abc');
+});
+
+test('tidyPracticeNoteText posts the note and returns the tidied text', async () => {
+  const calls = [];
+  const result = await tidyPracticeNoteText({
+    dashboardBaseUrl: 'https://dashboard.example',
+    studentId: 'sdt_abc',
+    tutor: 'Dean',
+    text: 'so um we played',
+    practiceChatSecret: 'secret-token',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return { ok: true, json: async () => ({ text: 'We played.', speakersAdded: true }) };
+    },
+  });
+
+  assert.deepEqual(result, { text: 'We played.', speakersAdded: true });
+  assert.equal(calls[0].url, 'https://dashboard.example/api/practice-notes/tidy');
+  assert.equal(calls[0].init.headers['X-FirstChord-PracticeChat-Secret'], 'secret-token');
+  assert.deepEqual(JSON.parse(calls[0].init.body), { studentId: 'sdt_abc', tutor: 'Dean', text: 'so um we played' });
+});
+
+test('tidyPracticeNoteText refuses an empty or failed reply, so the note is never blanked', async () => {
+  const failing = (status, payload) => async () => ({ ok: status === 200, status, json: async () => payload });
+  await assert.rejects(
+    tidyPracticeNoteText({ dashboardBaseUrl: 'https://d.example', fetchImpl: failing(422, { error: 'Tidy changed too much, so your note is unchanged.' }) }),
+    /changed too much/u,
+  );
+  await assert.rejects(
+    tidyPracticeNoteText({ dashboardBaseUrl: 'https://d.example', fetchImpl: failing(200, { text: '  ' }) }),
+    /unchanged/u,
+  );
 });
 
 test('suggestPracticeNoteSongs prioritises exact current-shelf mentions', () => {

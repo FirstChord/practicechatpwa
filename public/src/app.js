@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261105-drafts';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261105-drafts';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261106-tidy';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261106-tidy';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -14,8 +14,9 @@ import {
     previewPracticeNoteMmsTestWrite,
     savePracticeChatSession,
     savePracticeNoteSnapshot,
-    suggestPracticeNoteSongs
-} from './practice-note-sync.js?v=20261105-drafts';
+    suggestPracticeNoteSongs,
+    tidyPracticeNoteText
+} from './practice-note-sync.js?v=20261106-tidy';
 import {
     buildSessionPayload,
     createSession,
@@ -33,7 +34,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261105-drafts';
+} from './session-telemetry.js?v=20261106-tidy';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -41,12 +42,12 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261105-drafts';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261105-drafts';
-import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261105-drafts';
-import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261105-drafts';
+} from './note-markup.js?v=20261106-tidy';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261106-tidy';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261106-tidy';
+import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261106-tidy';
 
-const PRACTICE_CHAT_BUILD = '20261105-drafts';
+const PRACTICE_CHAT_BUILD = '20261106-tidy';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -95,6 +96,13 @@ class PracticeChatApp {
         this.selectedSongIds = new Set();
         this.unlistedSongTitles = [];
         this.songSelectionLocked = false;
+        // Tidy: shown only when the dashboard says this tutor has it. The
+        // note before the last tidy is kept until the tutor types again, so
+        // Undo can never throw away their own later edits.
+        this.tidyAvailable = false;
+        this.tidyBusy = false;
+        this.tidyUndoText = '';
+        this.applyingTidy = false;
         this.lastDashboardSavedText = '';
         this.dashboardSaveInFlight = false;
         this.mmsTestInFlight = false;
@@ -200,9 +208,12 @@ class PracticeChatApp {
         fetchPracticeChatMusicContext({
             dashboardBaseUrl: this.context.dashboardBaseUrl,
             studentId: this.context.studentId,
+            tutor: this.context.tutor,
             practiceChatSecret: this.context.practiceChatSecret
         }).then((context) => {
             this.transcriptionPrompt = context.prompt || '';
+            this.tidyAvailable = context.tidy === true;
+            this.syncTidyButton();
             this.availableSongs = context.songs || [];
             this.catalogueSongs = context.catalogueSongs || [];
             this.refreshSongSuggestions();
@@ -267,6 +278,7 @@ class PracticeChatApp {
 
         // Formatting toolbar
         this.noteToolbar = document.querySelector('.note-toolbar');
+        this.tidyBtn = document.getElementById('tidyNoteBtn');
 
         // Button state
         this.buttonState = 'start'; // start, stop, next, finish
@@ -322,6 +334,60 @@ class PracticeChatApp {
             event.preventDefault();
             document.execCommand('insertText', false, text);
         });
+    }
+
+    syncTidyButton() {
+        if (!this.tidyBtn) return;
+        this.tidyBtn.hidden = !this.tidyAvailable;
+        this.tidyBtn.disabled = this.tidyBusy || this.songSelectionLocked || this.noteDelivered;
+        this.tidyBtn.textContent = this.tidyBusy ? 'Tidying…' : (this.tidyUndoText ? 'Undo tidy' : 'Tidy');
+    }
+
+    replaceNoteForTidy(text) {
+        this.applyingTidy = true;
+        this.setNoteContent(text);
+        this.processedEl.dispatchEvent(new Event('input', { bubbles: true }));
+        this.applyingTidy = false;
+    }
+
+    async handleTidyClick() {
+        if (this.tidyBusy || this.songSelectionLocked || this.noteDelivered) return;
+        if (this.tidyUndoText) {
+            this.replaceNoteForTidy(this.tidyUndoText);
+            this.tidyUndoText = '';
+            this.syncTidyButton();
+            return;
+        }
+        const before = this.readNoteMarkup();
+        if (!before.trim() || this.isNotePlaceholder()) return;
+
+        this.tidyBusy = true;
+        this.syncTidyButton();
+        try {
+            const result = await tidyPracticeNoteText({
+                dashboardBaseUrl: this.context.dashboardBaseUrl,
+                studentId: this.context.studentId,
+                tutor: this.context.tutor,
+                text: before,
+                practiceChatSecret: this.context.practiceChatSecret
+            });
+            // The tutor may have typed while waiting; their words win.
+            if (this.readNoteMarkup() !== before) {
+                this.showStatus('Tidy skipped because the note changed while it ran.', 'warning');
+                return;
+            }
+            this.replaceNoteForTidy(result.text);
+            this.tidyUndoText = before;
+            if (result.speakersAdded) {
+                this.showStatus('Tidy added speaker names. Check who said what.', 'warning');
+            }
+        } catch (error) {
+            console.warn('Tidy failed:', error);
+            this.showStatus(error.message || 'Tidy is unavailable right now. Your note is unchanged.', 'warning');
+        } finally {
+            this.tidyBusy = false;
+            this.syncTidyButton();
+        }
     }
 
     applyNoteFormat(format) {
@@ -427,7 +493,12 @@ class PracticeChatApp {
         this.absenceBackBtn?.addEventListener('click', () => this.exitAbsence());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         this.newBtn.addEventListener('click', () => this.resetForNew());
+        this.tidyBtn?.addEventListener('click', () => this.handleTidyClick());
         this.processedEl.addEventListener('input', () => {
+            if (!this.applyingTidy && this.tidyUndoText) {
+                this.tidyUndoText = '';
+                this.syncTidyButton();
+            }
             this.refreshSongSuggestions();
             this.syncToolbarState();
             this.scheduleDraftSave();
@@ -1170,6 +1241,7 @@ class PracticeChatApp {
         // Every outcome here means the note went somewhere: sent, saved, or on
         // the clipboard. It is no longer a draft.
         this.noteDelivered = true;
+        this.syncTidyButton();
         window.clearTimeout(this.draftSaveTimer);
         clearDraft(this.draftStorage(), this.context.studentId);
 
@@ -1333,6 +1405,7 @@ class PracticeChatApp {
                     savedSnapshot = snapshot;
                     this.lastDashboardSavedText = snapshot.rawNoteText;
                     this.songSelectionLocked = true;
+                    this.syncTidyButton();
                     this.renderSongChoices();
                 }
                 if (result.noteId) {
@@ -2024,6 +2097,8 @@ class PracticeChatApp {
         this.unlistedSongTitles = [];
         this.suggestedSongs = [];
         this.songSelectionLocked = false;
+        this.tidyUndoText = '';
+        this.syncTidyButton();
         this.renderSongChoices();
         this.processedEl.textContent = NOTE_PLACEHOLDER;
         this.absenceMode = false;
@@ -2044,6 +2119,8 @@ class PracticeChatApp {
         this.unlistedSongTitles = [];
         this.suggestedSongs = [];
         this.songSelectionLocked = false;
+        this.tidyUndoText = '';
+        this.syncTidyButton();
         this.renderSongChoices();
         this.processedEl.textContent = NOTE_PLACEHOLDER;
         this.absenceMode = false;

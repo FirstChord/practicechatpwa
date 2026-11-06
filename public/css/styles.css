@@ -871,6 +871,20 @@ body {
     background: var(--bg-light);
 }
 
+/* Tidy sits apart from the formatting buttons: it rewrites, they format. */
+.note-tidy {
+    margin-left: auto;
+}
+
+.note-tool[hidden] {
+    display: none;
+}
+
+.note-tool:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
 /* B and I are drawn in a serif face on purpose. In the body sans-serif an
    italic capital I is a bare slanted bar and reads as a slash; the serifs give
    it a top and a foot, so it is unmistakably a letter. */
