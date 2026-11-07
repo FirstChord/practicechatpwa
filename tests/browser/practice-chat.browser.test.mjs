@@ -291,7 +291,7 @@ test('Tidy shows only when the dashboard offers it, replaces the note, and Undo 
 
     const api = (key, body) => {
         if (key === 'music-context') return { songs: [], catalogueSongs: [], tidy: true };
-        if (key === 'tidy') return { text: body.text.replace('Scales.', 'Scales and arpeggios.'), speakersAdded: true };
+        if (key === 'tidy') return { text: body.text.replace('Scales.', 'Scales and arpeggios.'), speakersAdded: true, notice: 'Tidy corrected song names (Let It Be). Check them.' };
         return key === 'group' ? { isGroup: false } : { ok: true };
     };
     const { page, calls, errors, close } = await openApp(server, { api });
@@ -302,7 +302,7 @@ test('Tidy shows only when the dashboard offers it, replaces the note, and Undo 
     await page.locator('#tidyNoteBtn', { hasText: 'Undo tidy' }).waitFor();
     assert.match(await savedNote(page), /Scales and arpeggios\./);
     assert.equal(calls.find((call) => call.key === 'tidy').text, original);
-    assert.match(await page.locator('#status').textContent(), /Check who said what/);
+    assert.match(await page.locator('#status').textContent(), /corrected song names \(Let It Be\)/);
 
     await page.click('#tidyNoteBtn');
     assert.equal(await savedNote(page), original);

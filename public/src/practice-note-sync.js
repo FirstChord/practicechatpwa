@@ -290,7 +290,13 @@ export async function tidyPracticeNoteText({
     if (!response.ok || typeof payload.text !== 'string' || !payload.text.trim()) {
         throw new Error(payload.error || 'Tidy is unavailable right now. Your note is unchanged.');
     }
-    return { text: payload.text, speakersAdded: payload.speakersAdded === true };
+    return {
+        text: payload.text,
+        speakersAdded: payload.speakersAdded === true,
+        // What the tutor should check, worded by the dashboard, so a new kind
+        // of check never needs a Practice Chat release.
+        notice: typeof payload.notice === 'string' ? payload.notice.trim().slice(0, 300) : ''
+    };
 }
 
 export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot = {}, fetchImpl = fetch } = {}) {

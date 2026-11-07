@@ -256,11 +256,11 @@ test('tidyPracticeNoteText posts the note and returns the tidied text', async ()
     practiceChatSecret: 'secret-token',
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
-      return { ok: true, json: async () => ({ text: 'We played.', speakersAdded: true }) };
+      return { ok: true, json: async () => ({ text: 'We played.', speakersAdded: true, notice: 'Tidy added speaker names. Check who said what.' }) };
     },
   });
 
-  assert.deepEqual(result, { text: 'We played.', speakersAdded: true });
+  assert.deepEqual(result, { text: 'We played.', speakersAdded: true, notice: 'Tidy added speaker names. Check who said what.' });
   assert.equal(calls[0].url, 'https://dashboard.example/api/practice-notes/tidy');
   assert.equal(calls[0].init.headers['X-FirstChord-PracticeChat-Secret'], 'secret-token');
   assert.deepEqual(JSON.parse(calls[0].init.body), { studentId: 'sdt_abc', tutor: 'Dean', text: 'so um we played' });
