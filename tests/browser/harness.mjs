@@ -42,14 +42,19 @@ export const DEFAULT_ASR_MODEL = 'whisper-1';
 export function resolveAsrModel() { return DEFAULT_ASR_MODEL; }
 window.__asr = { pending: null, release(value) { const p = this.pending; this.pending = null; p?.(value); }, auto: null };
 export class WhisperASRClient {
-    constructor() { this.onPartialTranscript = null; this.onFinalTranscript = null; this.onError = null; }
+    constructor() { this.onPartialTranscript = null; this.onFinalTranscript = null; this.onError = null; this.failedAudio = null; }
     async start() {}
-    async stop() {
+    async stop() { return this.answer(); }
+    hasFailedAudio() { return Boolean(this.failedAudio); }
+    async retryTranscription() { return this.answer(); }
+    // Like the real client: a failure keeps the recording, an answer clears it.
+    async answer() {
         this.onPartialTranscript?.('Tuning up the transcript…');
         const value = window.__asr.auto !== null
             ? window.__asr.auto
             : await new Promise((resolve) => { window.__asr.pending = resolve; });
-        if (value instanceof Error) throw value;
+        if (value instanceof Error) { this.failedAudio = true; throw value; }
+        this.failedAudio = null;
         this.onFinalTranscript?.(value);
         return value;
     }

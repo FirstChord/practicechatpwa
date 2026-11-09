@@ -117,6 +117,17 @@ test('the transcribing line shows while waiting and clears on an answer, a failu
     await page.waitForFunction(() => document.getElementById('status').style.display !== 'none');
     assert.equal(await line(), '');
 
+    // The failed recording is kept: Try again sends it, no re-recording.
+    assert.equal(await page.textContent('#mainActionText'), 'Try again');
+    assert.match(await page.textContent('#status'), /recording is kept/);
+    await page.click('#mainActionBtn');
+    await page.waitForFunction(() => window.__asr.pending);
+    assert.equal(await line(), 'Tuning up the transcript…');
+    await page.evaluate(() => window.__asr.release('Sent again.'));
+    await page.waitForFunction(() => document.getElementById('currentAnswer').textContent.includes('Sent again.'));
+    assert.equal(await line(), '');
+
+    await page.click('#mainActionBtn');          // Next
     await recordAndHold();
     await page.evaluate(() => window.__asr.release(''));
     await page.waitForFunction(() => document.getElementById('status').textContent.includes('No answer'));

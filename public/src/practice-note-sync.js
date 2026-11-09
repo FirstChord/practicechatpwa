@@ -12,6 +12,22 @@ function stableHash(text = '') {
     return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
+// A dropped connection surfaces as the browser's own words ("Failed to fetch",
+// "Load failed"), which mean nothing to a tutor mid-lesson. Every call to the
+// dashboard goes through here so a Wi-Fi blip reads the same everywhere.
+export const DASHBOARD_UNREACHABLE_MESSAGE = 'Couldn’t reach the dashboard. Check the Wi-Fi, then try again.';
+
+export async function fetchFromDashboard(fetchImpl, url, init) {
+    try {
+        return await fetchImpl(url, init);
+    } catch (error) {
+        if (error?.name === 'AbortError') throw error;
+        const unreachable = new Error(DASHBOARD_UNREACHABLE_MESSAGE);
+        unreachable.network = true;
+        throw unreachable;
+    }
+}
+
 export function buildPracticeNoteId({ studentId = '', lessonDate = '', rawNoteText = '' } = {}) {
     return `practice_note:${studentId || 'unknown'}:${lessonDate || 'unknown'}:${stableHash(rawNoteText).slice(0, 12)}`;
 }
@@ -227,7 +243,7 @@ export async function fetchPracticeChatMusicContext({
     const params = new URLSearchParams({ studentId });
     if (clean(tutor)) params.set('tutor', clean(tutor));
     const url = `${dashboardBaseUrl}/api/practice-notes/music-context?${params.toString()}`;
-    const response = await fetchImpl(url, {
+    const response = await fetchFromDashboard(fetchImpl, url, {
         method: 'GET',
         headers: {
             ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
@@ -278,7 +294,7 @@ export async function tidyPracticeNoteText({
     practiceChatSecret = '',
     fetchImpl = fetch
 } = {}) {
-    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/tidy`, {
+    const response = await fetchFromDashboard(fetchImpl, `${dashboardBaseUrl}/api/practice-notes/tidy`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -305,7 +321,7 @@ export async function savePracticeNoteSnapshot({ dashboardBaseUrl = '', snapshot
     }
 
     const { practiceChatSecret = '', ...snapshotPayload } = snapshot;
-    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes`, {
+    const response = await fetchFromDashboard(fetchImpl, `${dashboardBaseUrl}/api/practice-notes`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -387,7 +403,7 @@ async function callPracticeNoteMmsTestRoute({
     practiceChatSecret = '',
     fetchImpl = fetch
 } = {}) {
-    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/mms-test`, {
+    const response = await fetchFromDashboard(fetchImpl, `${dashboardBaseUrl}/api/practice-notes/mms-test`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -432,7 +448,7 @@ async function callPracticeNoteGroupRoute({
     practiceChatSecret = '',
     fetchImpl = fetch
 } = {}) {
-    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/group`, {
+    const response = await fetchFromDashboard(fetchImpl, `${dashboardBaseUrl}/api/practice-notes/group`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

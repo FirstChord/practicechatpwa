@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261109-tidy-green';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261109-tidy-green';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261109-resilience';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261109-resilience';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -16,7 +16,7 @@ import {
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs,
     tidyPracticeNoteText
-} from './practice-note-sync.js?v=20261109-tidy-green';
+} from './practice-note-sync.js?v=20261109-resilience';
 import {
     buildSessionPayload,
     createSession,
@@ -34,7 +34,7 @@ import {
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261109-tidy-green';
+} from './session-telemetry.js?v=20261109-resilience';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -42,12 +42,12 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261109-tidy-green';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261109-tidy-green';
-import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261109-tidy-green';
-import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261109-tidy-green';
+} from './note-markup.js?v=20261109-resilience';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261109-resilience';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261109-resilience';
+import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261109-resilience';
 
-const PRACTICE_CHAT_BUILD = '20261109-tidy-green';
+const PRACTICE_CHAT_BUILD = '20261109-resilience';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -90,6 +90,8 @@ class PracticeChatApp {
         // Songs and instrument for this student, used to tell the model what
         // words to expect. Loaded once per session, in the background.
         this.transcriptionPrompt = '';
+        // The recorder holding an answer whose transcription failed, if any.
+        this.failedRecordingClient = null;
         this.availableSongs = [];
         this.catalogueSongs = [];
         this.suggestedSongs = [];
@@ -813,6 +815,9 @@ class PracticeChatApp {
             case 'finish':
                 this.finishRecording();
                 break;
+            case 'retry':
+                this.retryTranscription();
+                break;
         }
     }
 
@@ -834,7 +839,7 @@ class PracticeChatApp {
         this.mainActionHint.textContent = state === 'stop' ? 'Tap to stop' : '';
 
         this.mainActionBtn.className = 'btn btn-large';
-        if (state === 'start') {
+        if (state === 'start' || state === 'retry') {
             this.mainActionBtn.classList.add('btn-primary');
         } else if (state === 'stop' || state === 'processing') {
             this.mainActionBtn.classList.add('btn-listening');
@@ -908,6 +913,9 @@ class PracticeChatApp {
                 || !isLocalMmsWriteTestAvailable({ context: this.context });
         }
 
+        // A kept recording belongs to the question it was made on.
+        this.failedRecordingClient = null;
+
         // Show current answer if exists
         const currentAnswer = this.questionAnswers[this.currentQuestionIndex];
         if (currentAnswer) {
@@ -944,6 +952,7 @@ class PracticeChatApp {
     }
 
     async startRecording() {
+        this.failedRecordingClient = null;
         try {
 
             // Create new Whisper ASR client
@@ -969,13 +978,11 @@ class PracticeChatApp {
                 this.processCurrentAnswer();
             };
 
+            // Every failure the client reports here also rejects to
+            // startRecording or stopRecording, which record and show it. Doing
+            // both counted each failure twice in asr_error_count.
             this.asrClient.onError = (error) => {
-                this.setProcessingMessage('');
-                recordAsrError(this.session, this.currentQuestionIndex);
-                this.showStatus(`Error: ${error.message}`, 'error');
-                this.isRecording = false;
-                this.updateMainButton('start', 'Start recording');
-                this.skipBtn.disabled = false;
+                console.warn('Recording client reported:', error?.message || error);
             };
 
             // Start recording
@@ -1003,6 +1010,7 @@ class PracticeChatApp {
 
     async stopRecording() {
         if (!this.asrClient) return;
+        const client = this.asrClient;
 
         try {
             this.updateMainButton('processing', 'Transcribing…');
@@ -1013,7 +1021,7 @@ class PracticeChatApp {
             recordingStopped(this.session, this.currentQuestionIndex);
 
             // Stop recording and get transcript
-            await this.asrClient.stop();
+            await client.stop();
 
             this.isRecording = false;
             this.skipBtn.disabled = false;
@@ -1022,16 +1030,56 @@ class PracticeChatApp {
 
         } catch (error) {
             console.error('Failed to process recording:', error);
-            this.setProcessingMessage('');
-            recordAsrError(this.session, this.currentQuestionIndex);
-            this.showStatus(`Processing failed: ${error.message}`, 'error');
             this.isRecording = false;
+            this.showTranscriptionFailure(error, client);
+        } finally {
+            this.asrClient = null;
+        }
+    }
+
+    // A failed transcription keeps the recording when there is one, so the
+    // main button sends the same audio again rather than asking the student to
+    // repeat themselves. Skip, Back or a new recording drops it.
+    showTranscriptionFailure(error, client = null) {
+        this.setProcessingMessage('');
+        recordAsrError(this.session, this.currentQuestionIndex);
+        this.skipBtn.disabled = false;
+        this.backBtn.disabled = false;
+        this.mainActionBtn.disabled = false;
+        const reason = `${error?.message || 'Transcription failed.'}`.replace(/\s*$/u, '');
+        if (client?.hasFailedAudio?.()) {
+            this.failedRecordingClient = client;
+            this.showStatus(`${reason} Your recording is kept.`, 'error');
+            this.updateMainButton('retry', 'Try again', '↻');
+        } else {
+            this.failedRecordingClient = null;
+            this.showStatus(reason, 'error');
             this.updateMainButton('start', 'Start recording');
+        }
+    }
+
+    async retryTranscription() {
+        const client = this.failedRecordingClient;
+        if (!client) {
+            this.updateMainButton('start', 'Start recording');
+            return;
+        }
+        this.clearStatus();
+        this.updateMainButton('processing', 'Transcribing…');
+        this.mainActionBtn.disabled = true;
+        this.skipBtn.disabled = true;
+        this.backBtn.disabled = true;
+        try {
+            // Success arrives through the client's onFinalTranscript, exactly
+            // as a first attempt does.
+            await client.retryTranscription();
+            this.failedRecordingClient = null;
             this.skipBtn.disabled = false;
             this.backBtn.disabled = false;
             this.mainActionBtn.disabled = false;
-        } finally {
-            this.asrClient = null;
+        } catch (error) {
+            console.error('Retrying the transcription failed:', error);
+            this.showTranscriptionFailure(error, client);
         }
     }
 

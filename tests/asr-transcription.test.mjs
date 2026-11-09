@@ -92,3 +92,48 @@ test('records in whichever format the browser supports, so Safari gets mp4 not w
   assert.equal(pickRecorderMimeType(only()), '');
   assert.equal(pickRecorderMimeType({}), '');
 });
+
+test('a dropped connection reads as plain words, and a refusal carries its status and code', async () => {
+  await assert.rejects(
+    transcribeViaDashboard({ dashboardBaseUrl: 'https://dash.example', audioBlob: audio(), fetchImpl: async () => { throw new TypeError('Failed to fetch'); } }),
+    (error) => error.network === true && /Couldn’t reach the dashboard/.test(error.message) && !/Failed to fetch/.test(error.message)
+  );
+  await assert.rejects(
+    transcribeViaDashboard({ dashboardBaseUrl: 'https://dash.example', audioBlob: audio(), fetchImpl: async () => new Response(JSON.stringify({ error: 'Busy', code: 'rate_limited' }), { status: 503 }) }),
+    (error) => error.status === 503 && error.code === 'rate_limited'
+  );
+});
+
+test('the recorder tries an unreachable dashboard once more, and keeps a failed recording to send again', async () => {
+  const originalFetch = globalThis.fetch;
+  const replies = [];
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    const next = replies.shift();
+    if (next instanceof Error) throw next;
+    return new Response(JSON.stringify(next.body), { status: next.status });
+  };
+  try {
+    const client = new WhisperASRClient({ dashboardBaseUrl: 'https://dash.example' });
+
+    replies.push(new TypeError('Failed to fetch'), { status: 200, body: { text: 'Scales.', model: 'whisper-1' } });
+    assert.equal(await client.transcribeAudio(audio(), { retryDelayMs: 0 }), 'Scales.');
+    assert.equal(calls, 2);
+
+    calls = 0;
+    replies.push({ status: 503, body: { error: 'Transcription is busy.', code: 'rate_limited' } });
+    await assert.rejects(client.transcribeAudio(audio(), { retryDelayMs: 0 }), /busy/);
+    assert.equal(calls, 1, 'the dashboard already retried OpenAI; the browser does not pile on');
+
+    client.failedAudio = audio();
+    let final = '';
+    client.onFinalTranscript = (text) => { final = text; };
+    replies.push({ status: 200, body: { text: 'Arpeggios.', model: 'whisper-1' } });
+    assert.equal(await client.retryTranscription(), 'Arpeggios.');
+    assert.equal(final, 'Arpeggios.');
+    assert.equal(client.hasFailedAudio(), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

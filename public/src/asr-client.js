@@ -1,4 +1,5 @@
 // Practice Chat - ASR Client Module
+import { fetchFromDashboard } from './practice-note-sync.js?v=20261109-resilience';
 // Records the answer, then sends the audio to the dashboard, which calls OpenAI
 // server-side and returns only the text. The browser never holds an API key:
 // it used to fetch the raw key from the relay's /api-key and call OpenAI itself.
@@ -81,7 +82,7 @@ export async function transcribeViaDashboard({
     formData.append('model', model);
     if (prompt) formData.append('prompt', prompt);
 
-    const response = await fetchImpl(`${dashboardBaseUrl}/api/practice-notes/transcribe`, {
+    const response = await fetchFromDashboard(fetchImpl, `${dashboardBaseUrl}/api/practice-notes/transcribe`, {
         method: 'POST',
         headers: {
             ...(practiceChatSecret ? { 'X-FirstChord-PracticeChat-Secret': practiceChatSecret } : {})
@@ -91,7 +92,10 @@ export async function transcribeViaDashboard({
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-        throw new Error(payload.error || `Transcription failed (${response.status})`);
+        const error = new Error(payload.error || `Transcription failed (${response.status})`);
+        error.status = response.status;
+        error.code = payload.code || '';
+        throw error;
     }
     // The dashboard reports the model it actually used, which differs from the
     // request whenever it fell back.
@@ -117,6 +121,10 @@ export class WhisperASRClient {
         this.onPartialTranscript = null;
         this.onFinalTranscript = null;
         this.onError = null;
+
+        // A recording whose transcription failed. Kept so the tutor can send
+        // it again instead of asking the student to say it all twice.
+        this.failedAudio = null;
     }
 
     async start() {
@@ -180,6 +188,7 @@ export class WhisperASRClient {
             // Stop recording and wait for data
             return new Promise((resolve, reject) => {
                 this.mediaRecorder.onstop = async () => {
+                    let audioBlob = null;
                     try {
                         console.log('✅ Recording stopped, processing...');
                         this.isRecording = false;
@@ -189,7 +198,7 @@ export class WhisperASRClient {
                         }
 
                         // Create audio blob
-                        const audioBlob = new Blob(this.audioChunks, {
+                        audioBlob = new Blob(this.audioChunks, {
                             type: this.mediaRecorder?.mimeType || this.audioChunks[0].type || 'audio/webm'
                         });
                         console.log('📦 Audio blob created, size:', audioBlob.size, 'bytes');
@@ -208,6 +217,7 @@ export class WhisperASRClient {
 
                     } catch (error) {
                         console.error('❌ Transcription failed:', error);
+                        this.failedAudio = audioBlob || null;
                         if (this.onError) this.onError(error);
                         this.cleanup();
                         reject(error);
@@ -225,23 +235,43 @@ export class WhisperASRClient {
         }
     }
 
-    async transcribeAudio(audioBlob) {
+    // The dashboard retries OpenAI's own hiccups. This covers the step before:
+    // the dashboard itself unreachable for a moment (Wi-Fi, a deploy restarting
+    // it), which only the browser can try again.
+    async transcribeAudio(audioBlob, { retryDelayMs = 1500 } = {}) {
+        const send = () => transcribeViaDashboard({
+            dashboardBaseUrl: this.dashboardBaseUrl,
+            practiceChatSecret: this.practiceChatSecret,
+            audioBlob,
+            model: this.model,
+            prompt: this.prompt
+        });
+        console.log('📤 Sending audio for transcription...');
+        let result;
         try {
-            console.log('📤 Sending audio for transcription...');
-            const { text, model } = await transcribeViaDashboard({
-                dashboardBaseUrl: this.dashboardBaseUrl,
-                practiceChatSecret: this.practiceChatSecret,
-                audioBlob,
-                model: this.model,
-                prompt: this.prompt
-            });
-            this.model = model;
-            console.log('✅ Transcription completed');
-            return text;
+            result = await send();
         } catch (error) {
-            console.error('❌ Transcription error:', error);
-            throw new Error(`Transcription failed: ${error.message}`);
+            if (!error?.network && ![502, 504].includes(error?.status)) throw error;
+            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+            result = await send();
         }
+        this.model = result.model;
+        console.log('✅ Transcription completed');
+        return result.text;
+    }
+
+    hasFailedAudio() {
+        return Boolean(this.failedAudio);
+    }
+
+    // Send the kept recording again. Throws, keeping it, if this fails too.
+    async retryTranscription() {
+        if (!this.failedAudio) throw new Error('There is no recording to send again.');
+        if (this.onPartialTranscript) this.onPartialTranscript(getRandomProcessingMessage());
+        const transcript = await this.transcribeAudio(this.failedAudio);
+        this.failedAudio = null;
+        if (this.onFinalTranscript) this.onFinalTranscript(transcript);
+        return transcript;
     }
 
     cleanup() {
