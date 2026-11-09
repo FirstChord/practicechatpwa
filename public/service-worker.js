@@ -3,20 +3,20 @@
  * Provides offline support and caching
  */
 
-const CACHE_NAME = 'practice-chat-v44-tidy-songs';
+const CACHE_NAME = 'practice-chat-v45-tidy-green';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/css/styles.css?v=20261107-tidy-songs',
-  '/src/app.js?v=20261107-tidy-songs',
-  '/src/practice-note-sync.js?v=20261107-tidy-songs',
-  '/src/note-markup.js?v=20261107-tidy-songs',
-  '/src/time-of-day-sky.js?v=20261107-tidy-songs',
-  '/src/note-sections.js?v=20261107-tidy-songs',
-  '/src/note-draft.js?v=20261107-tidy-songs',
+  '/css/styles.css?v=20261109-tidy-green',
+  '/src/app.js?v=20261109-tidy-green',
+  '/src/practice-note-sync.js?v=20261109-tidy-green',
+  '/src/note-markup.js?v=20261109-tidy-green',
+  '/src/time-of-day-sky.js?v=20261109-tidy-green',
+  '/src/note-sections.js?v=20261109-tidy-green',
+  '/src/note-draft.js?v=20261109-tidy-green',
   '/src/asr-client.js',
   '/src/text-processor.js',
   '/manifest.json'
