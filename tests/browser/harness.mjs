@@ -64,7 +64,7 @@ const lessonStart = new Date();
 lessonStart.setHours(16, 0, 0, 0);
 export const ATTENDANCE = { attendanceId: 'att_test_1', eventStartDate: lessonStart.toISOString(), attendanceStatus: 'Unrecorded' };
 
-function defaultApi(key, body) {
+export function defaultApi(key, body) {
     if (key === 'mms-test') {
         return body.mode === 'execute'
             ? { targetAttendance: { ...ATTENDANCE, attendanceStatus: body.attendanceStatus }, candidateAttendances: [ATTENDANCE], requestedAttendanceStatus: body.attendanceStatus, practiceNoteLog: { ok: true, noteId: 'note_test' }, emailNotes: { ok: true }, practiceNoteEmail: { toEmail: 'parent@example.com' } }

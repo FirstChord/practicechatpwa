@@ -13,6 +13,7 @@ import {
     recordSafety,
     recordSkip,
     recordSongs,
+    recordTidy,
     recordingStarted,
     recordingStopped,
     shouldFlushOnHide,
@@ -325,4 +326,22 @@ test('every telemetry function tolerates a null session', () => {
     for (const call of calls) {
         assert.doesNotThrow(call);
     }
+});
+
+test('Tidy is three counts: asked, undone and came back empty', () => {
+    const session = newSession();
+    assert.equal(buildSessionPayload(session).tidyPressed, 0);
+
+    recordTidy(session, 'pressed');
+    recordTidy(session, 'refused');
+    recordTidy(session, 'pressed');
+    recordTidy(session, 'undone');
+    recordTidy(session, 'something else');
+
+    const payload = buildSessionPayload(session);
+    assert.equal(payload.tidyPressed, 2);
+    assert.equal(payload.tidyRefused, 1);
+    assert.equal(payload.tidyUndone, 1);
+    // A missing session must cost a tutor nothing.
+    assert.equal(recordTidy(null, 'pressed'), null);
 });

@@ -71,6 +71,11 @@ export function createSession({ context = {}, asrModel = '', buildVersion = '', 
         editCharDelta: 0,
         songsSelected: 0,
         unlistedSongs: 0,
+        // Tidy, as counts only: how often it was asked for, how often it was
+        // undone, and how often it came back without a tidy. Never the text.
+        tidyPressed: 0,
+        tidyUndone: 0,
+        tidyRefused: 0,
         // What the tutor had in front of them, as told to us by the dashboard.
         // "A previous note existed" is availability, never evidence of reading:
         // the dashboard renders it automatically on student select.
@@ -229,6 +234,23 @@ export function recordSongs(session, { songIds = [], unlistedTitles = [] } = {})
     return session;
 }
 
+/**
+ * One Tidy event on the review screen, as a count.
+ *
+ * `pressed` is a tidy asked of the dashboard, `refused` is one that came back
+ * with no tidy (a failed check, a provider error, Tidy switched off), and
+ * `undone` is the tutor putting their own words back. Tidy stores nothing
+ * about the note, so without these three numbers nobody can tell which notes
+ * it touched or whether tutors kept what it gave them.
+ */
+export function recordTidy(session, event = '') {
+    if (!session) return session;
+    if (event === 'pressed') session.tidyPressed += 1;
+    if (event === 'undone') session.tidyUndone += 1;
+    if (event === 'refused') session.tidyRefused += 1;
+    return session;
+}
+
 export function recordRating(session, { accuracy = '', comment = '', now = nowMs() } = {}) {
     if (!session) return session;
     session.ratingAnsweredAt = new Date(now).toISOString();
@@ -340,6 +362,9 @@ export function buildSessionPayload(session) {
         editCharDelta: session.editCharDelta,
         songsSelected: session.songsSelected,
         unlistedSongs: session.unlistedSongs,
+        tidyPressed: session.tidyPressed,
+        tidyUndone: session.tidyUndone,
+        tidyRefused: session.tidyRefused,
         priorNoteExists: session.priorNoteExists,
         priorNoteAgeDays: Number.isFinite(session.priorNoteAgeDays) ? session.priorNoteAgeDays : '',
         priorHistoryOpened: session.priorHistoryOpened,

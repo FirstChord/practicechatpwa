@@ -1,5 +1,5 @@
 // Practice Chat - ASR Client Module
-import { fetchFromDashboard } from './practice-note-sync.js?v=20261109-resilience';
+import { fetchFromDashboard } from './practice-note-sync.js?v=20261113-tidy-counts';
 // Records the answer, then sends the audio to the dashboard, which calls OpenAI
 // server-side and returns only the text. The browser never holds an API key:
 // it used to fetch the raw key from the relay's /api-key and call OpenAI itself.

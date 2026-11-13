@@ -22,7 +22,7 @@
  * what gets sent.
  */
 
-import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261109-resilience';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261113-tidy-counts';
 
 const BOLD = /\*\*(?!\s)([^\n*]+?)(?<!\s)\*\*/g;
 const ITALIC = /(^|[^\w*])_(?!\s)([^\n_]+?)(?<!\s)_(?![\w*])/g;

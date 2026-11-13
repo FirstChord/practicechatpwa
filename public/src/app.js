@@ -1,8 +1,8 @@
 // Practice Chat - Main Application
 // Handles recording, transcription, and UI with three-question flow
 
-import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261109-resilience';
-import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261109-resilience';
+import { resolveAsrModel, WhisperASRClient } from './asr-client.js?v=20261113-tidy-counts';
+import { checkNoteSafety, enhancedCleanupSpeechText } from './text-processor.js?v=20261113-tidy-counts';
 import {
     buildPracticeNoteSnapshot,
     executePracticeNoteGroup,
@@ -16,7 +16,7 @@ import {
     savePracticeNoteSnapshot,
     suggestPracticeNoteSongs,
     tidyPracticeNoteText
-} from './practice-note-sync.js?v=20261109-resilience';
+} from './practice-note-sync.js?v=20261113-tidy-counts';
 import {
     buildSessionPayload,
     createSession,
@@ -29,12 +29,13 @@ import {
     recordSafety,
     recordSkip,
     recordSongs,
+    recordTidy,
     recordingStarted,
     recordingStopped,
     shouldFlushOnHide,
     shouldPromptForRating,
     transcriptReceived
-} from './session-telemetry.js?v=20261109-resilience';
+} from './session-telemetry.js?v=20261113-tidy-counts';
 import {
     noteMarkupToHtml,
     rawNoteText,
@@ -42,12 +43,12 @@ import {
     serialiseNoteMarkup,
     stripNoteMarkers,
     toggleBulletLines
-} from './note-markup.js?v=20261109-resilience';
-import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261109-resilience';
-import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261109-resilience';
-import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261109-resilience';
+} from './note-markup.js?v=20261113-tidy-counts';
+import { getTimeOfDaySky, skyBackground } from './time-of-day-sky.js?v=20261113-tidy-counts';
+import { NOTE_SECTION_LABELS } from './note-sections.js?v=20261113-tidy-counts';
+import { clearDraft, pruneDrafts, readDraft, writeDraft } from './note-draft.js?v=20261113-tidy-counts';
 
-const PRACTICE_CHAT_BUILD = '20261109-resilience';
+const PRACTICE_CHAT_BUILD = '20261113-tidy-counts';
 
 // Each question is what the tutor says aloud, plus at most one lighter
 // follow-up line. Worded to work whether the student or the tutor answers: many
@@ -358,6 +359,7 @@ class PracticeChatApp {
         if (this.tidyUndoText) {
             this.replaceNoteForTidy(this.tidyUndoText);
             this.tidyUndoText = '';
+            recordTidy(this.session, 'undone');
             this.syncTidyButton();
             return;
         }
@@ -366,6 +368,7 @@ class PracticeChatApp {
 
         this.tidyBusy = true;
         this.syncTidyButton();
+        recordTidy(this.session, 'pressed');
         try {
             const result = await tidyPracticeNoteText({
                 dashboardBaseUrl: this.context.dashboardBaseUrl,
@@ -385,6 +388,7 @@ class PracticeChatApp {
             if (notice) this.showStatus(notice, 'warning');
         } catch (error) {
             console.warn('Tidy failed:', error);
+            recordTidy(this.session, 'refused');
             this.showStatus(error.message || 'Tidy is unavailable right now. Your note is unchanged.', 'warning');
         } finally {
             this.tidyBusy = false;

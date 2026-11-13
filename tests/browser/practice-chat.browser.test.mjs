@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { answer, buttonTop, closeBrowser, completeQuestions, openApp, startServer } from './harness.mjs';
+import { answer, buttonTop, closeBrowser, completeQuestions, defaultApi, openApp, startServer } from './harness.mjs';
 
 let server;
 before(async () => { server = await startServer(); });
@@ -325,6 +325,48 @@ test('Tidy shows only when the dashboard offers it, replaces the note, and Undo 
     await page.click('#processed');
     await page.keyboard.type(' x');
     assert.equal(await page.locator('#tidyNoteBtn').textContent(), 'Tidy');
+    assert.deepEqual(errors, []);
+    await close();
+});
+
+test('the finished session reports Tidy as three counts and never the note', async () => {
+    let tidyCalls = 0;
+    const api = (key, body) => {
+        if (key === 'music-context') return { songs: [], catalogueSongs: [], tidy: true };
+        if (key === 'tidy') {
+            tidyCalls += 1;
+            return tidyCalls === 1
+                ? { error: 'Tidy changed too much, so your note is unchanged.', code: 'failed_checks' }
+                : { text: body.text.replace('Scales.', 'Scales and arpeggios.') };
+        }
+        return defaultApi(key, body);
+    };
+    const { page, calls, errors, close } = await openApp(server, { api });
+    await completeQuestions(page, ['Scales.', 'Good.', 'Slowly.']);
+
+    // Refused, then tidied, then undone, then tidied again and kept.
+    await page.click('#tidyNoteBtn');
+    await page.locator('#status', { hasText: 'changed too much' }).waitFor();
+    await page.click('#tidyNoteBtn');
+    await page.locator('#tidyNoteBtn', { hasText: 'Undo tidy' }).waitFor();
+    await page.click('#tidyNoteBtn');
+    await page.locator('#tidyNoteBtn', { hasText: /^Tidy$/ }).waitFor();
+    await page.click('#tidyNoteBtn');
+    await page.locator('#tidyNoteBtn', { hasText: 'Undo tidy' }).waitFor();
+
+    await page.click('#mmsDateConfirm');
+    await page.click('#mmsExecuteBtn');
+    await page.click('#sendRecipientConfirm');
+    await page.click('.action-confirm-primary');
+    await page.waitForFunction(() => document.getElementById('mmsExecuteBtn').textContent.includes('Lesson done'));
+    await page.waitForTimeout(200);
+
+    const finished = calls.filter((call) => call.key === 'practice-chat-sessions' && call.phase === 'finished').at(-1);
+    assert.ok(finished, 'the finished session was sent');
+    assert.equal(finished.tidyPressed, 3);
+    assert.equal(finished.tidyRefused, 1);
+    assert.equal(finished.tidyUndone, 1);
+    assert.equal(JSON.stringify(finished).includes('arpeggios'), false);
     assert.deepEqual(errors, []);
     await close();
 });
